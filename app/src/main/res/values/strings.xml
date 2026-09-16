@@ -1,0 +1,41 @@
+<resources>
+    <string name="app_name">My Keyboard</string>
+    <string name="subtype_english">English (US)</string>
+
+    <string name="tagline">Themes you design, autocorrect that understands you, and next-word prediction that learns how you type.</string>
+    <string name="step1_title">Step 1 · Enable My Keyboard</string>
+    <string name="step1_body">Turn on My Keyboard in your phone\'s keyboard settings.</string>
+    <string name="step1_button">Open keyboard settings</string>
+    <string name="step2_title">Step 2 · Choose My Keyboard</string>
+    <string name="step2_body">Pick My Keyboard as your current keyboard.</string>
+    <string name="step2_button">Choose keyboard</string>
+    <string name="status_enabled">✓ Enabled</string>
+    <string name="status_not_enabled">Not enabled yet</string>
+    <string name="status_selected">✓ Selected as current keyboard</string>
+    <string name="status_not_selected">Not selected yet</string>
+
+    <string name="try_title">Try it out</string>
+    <string name="try_hint">Tap here and start typing…</string>
+
+    <string name="themes_title">Themes</string>
+    <string name="themes_body">Pick a preset or build your own below. Changes apply instantly.</string>
+    <string name="custom_title">Custom theme</string>
+    <string name="custom_body">Choose your own colours for the keyboard.</string>
+    <string name="custom_background">Background</string>
+    <string name="custom_keys">Keys</string>
+    <string name="custom_text">Text</string>
+    <string name="custom_accent">Accent</string>
+    <string name="custom_apply">Use custom theme</string>
+
+    <string name="typing_title">Typing</string>
+    <string name="pref_autocorrect">Auto-correction</string>
+    <string name="pref_autocorrect_sum">Fix misspelled words when you press space</string>
+    <string name="pref_prediction">Next-word prediction</string>
+    <string name="pref_prediction_sum">Suggest the next word, learned from your own typing</string>
+    <string name="pref_popup">Key popup</string>
+    <string name="pref_vibrate">Vibrate on keypress</string>
+    <string name="pref_sound">Sound on keypress</string>
+    <string name="clear_learned">Clear learned words</string>
+    <string name="clear_learned_confirm">This deletes everything the keyboard has learned from your typing. Continue?</string>
+    <string name="clear_learned_done">Learned words cleared</string>
+</resources>
