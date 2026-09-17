@@ -8,7 +8,9 @@ class Key(
     val type: KeyType = KeyType.CHAR,
     val width: Float = 1f,
     val hint: String? = null,
-    val output: String = label
+    val output: String = label,
+    /** Row height multiplier; the number row is shorter than letter rows. */
+    val heightScale: Float = 1f
 ) {
     var x = 0f
     var y = 0f
@@ -29,8 +31,10 @@ class Layout(val id: String, val rows: List<List<Key>>) {
 /** Gboard-style layouts. Fresh instances are returned because keys carry geometry. */
 object Layouts {
 
-    private fun chars(s: String, hints: String? = null): List<Key> =
-        s.mapIndexed { i, c -> Key(c.toString(), hint = hints?.getOrNull(i)?.toString()) }
+    private const val NUMBER_ROW_SCALE = 0.78f
+
+    private fun chars(s: String, hints: String? = null, scale: Float = 1f): List<Key> =
+        s.mapIndexed { i, c -> Key(c.toString(), hint = hints?.getOrNull(i)?.toString(), heightScale = scale) }
 
     private fun bottomRow(switch: KeyType): List<Key> {
         val switchLabel = if (switch == KeyType.TO_LETTERS) "ABC" else "?123"
@@ -43,22 +47,26 @@ object Layouts {
         )
     }
 
-    fun qwerty() = Layout(
-        "qwerty",
-        listOf(
-            chars("qwertyuiop", "1234567890"),
-            chars("asdfghjkl", "@#$%&-+()"),
-            listOf(Key("⇧", KeyType.SHIFT, 1.5f)) + chars("zxcvbnm", "*\"':;!?") + Key("⌫", KeyType.DELETE, 1.5f),
-            bottomRow(KeyType.TO_SYMBOLS)
-        )
-    )
+    /**
+     * Letters. With [numberRow] a short row of digits sits on top and the top letter row's
+     * hints become symbols instead of digits so nothing is duplicated.
+     */
+    fun qwerty(numberRow: Boolean = false): Layout {
+        val rows = ArrayList<List<Key>>(5)
+        if (numberRow) rows.add(chars("1234567890", scale = NUMBER_ROW_SCALE))
+        rows.add(chars("qwertyuiop", if (numberRow) "%^~|[]<>{}" else "1234567890"))
+        rows.add(chars("asdfghjkl", "@#$&*-+()"))
+        rows.add(listOf(Key("⇧", KeyType.SHIFT, 1.5f)) + chars("zxcvbnm", "_\"':;!?") + Key("⌫", KeyType.DELETE, 1.5f))
+        rows.add(bottomRow(KeyType.TO_SYMBOLS))
+        return Layout("qwerty", rows)
+    }
 
     fun symbols() = Layout(
         "symbols",
         listOf(
-            chars("1234567890"),
-            chars("@#\$_&-+()/"),
-            listOf(Key("=\\<", KeyType.TO_SYMBOLS2, 1.5f)) + chars("*\"':;!?") + Key("⌫", KeyType.DELETE, 1.5f),
+            chars("1234567890", "¹²³⁴⁵⁶⁷⁸⁹⁰"),
+            chars("@#\$_&-+()/", "•£€™—±≠<>÷"),
+            listOf(Key("=\\<", KeyType.TO_SYMBOLS2, 1.5f)) + chars("*\"':;!?", "†«»‚„¡¿") + Key("⌫", KeyType.DELETE, 1.5f),
             bottomRow(KeyType.TO_LETTERS)
         )
     )
@@ -67,8 +75,8 @@ object Layouts {
         "symbols2",
         listOf(
             chars("~`|•√π÷×¶∆"),
-            chars("£¢€¥^°={}"),
-            listOf(Key("?123", KeyType.TO_SYMBOLS, 1.5f)) + chars("\\©®™✓[]") + Key("⌫", KeyType.DELETE, 1.5f),
+            chars("£¢€¥^°={}", "₹₽₩₺∞≈≡[]"),
+            listOf(Key("?123", KeyType.TO_SYMBOLS, 1.5f)) + chars("\\©®™✓[]", "§℠℗☆‹›") + Key("⌫", KeyType.DELETE, 1.5f),
             bottomRow(KeyType.TO_LETTERS)
         )
     )
