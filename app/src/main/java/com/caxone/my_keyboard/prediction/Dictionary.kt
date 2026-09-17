@@ -11,6 +11,7 @@ class Dictionary(private val context: Context) {
     private val frequency = HashMap<String, Int>(40_000)
     private var sorted: Array<String> = emptyArray()
     private val byLength = Array(MAX_LEN + 1) { ArrayList<String>() }
+    private val byFirst = HashMap<Char, ArrayList<String>>()
     private val seedNext = HashMap<String, ArrayList<Pair<String, Int>>>()
 
     @Volatile
@@ -29,6 +30,7 @@ class Dictionary(private val context: Context) {
                 if (frequency.put(w, f) == null) {
                     words.add(w)
                     if (w.length <= MAX_LEN) byLength[w.length].add(w)
+                    byFirst.getOrPut(w[0]) { ArrayList() }.add(w)
                 }
             }
         }
@@ -52,6 +54,8 @@ class Dictionary(private val context: Context) {
 
     fun wordsOfLength(len: Int): List<String> =
         if (len in 1..MAX_LEN) byLength[len] else emptyList()
+
+    fun wordsStartingWith(c: Char): List<String> = byFirst[c] ?: emptyList()
 
     fun seedNext(prev: String): List<Pair<String, Int>> = seedNext[prev] ?: emptyList()
 

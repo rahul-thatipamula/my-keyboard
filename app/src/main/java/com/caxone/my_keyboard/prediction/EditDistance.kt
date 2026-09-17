@@ -34,6 +34,8 @@ object EditDistance {
 
     fun adjacent(a: Char, b: Char): Boolean = neighbours[a]?.contains(b) == true
 
+    fun neighboursOf(c: Char): Set<Char> = neighbours[c] ?: emptySet()
+
     /** Returns the weighted distance, or a value > [max] as soon as it is certain to exceed it. */
     fun distance(a: String, b: String, max: Double): Double {
         val n = a.length
