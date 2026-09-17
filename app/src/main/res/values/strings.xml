@@ -20,6 +20,7 @@
     <string name="nav_themes_sum">%1$s · 8 presets and custom colours</string>
     <string name="nav_layout">Keyboard layout</string>
     <string name="nav_layout_sum">%1$s · QWERTZ, AZERTY, Dvorak, Colemak, Workman</string>
+    <string name="nav_languages">Languages</string>
     <string name="nav_typing">Typing</string>
     <string name="nav_typing_sum">Autocorrect, phrases, glide typing, number row</string>
     <string name="nav_feedback">Key press</string>
@@ -57,6 +58,21 @@
     <string name="custom_text">Text</string>
     <string name="custom_accent">Accent</string>
     <string name="custom_apply">Use custom theme</string>
+
+    <!-- Languages -->
+    <string name="languages_body">The keyboard has a built-in intelligent layer that knows English and Tenglish (Telugu written with English letters). Tell it what you type so its suggestions, phrases and corrections fit.</string>
+    <string name="languages_section_choose">I mostly type</string>
+    <string name="languages_english">English only</string>
+    <string name="languages_english_sum">English words, phrases and autocorrect</string>
+    <string name="languages_telugu">Telugu (Tenglish)</string>
+    <string name="languages_telugu_sum">Tenglish first, English loanwords too; no autocorrect inside Telugu sentences</string>
+    <string name="languages_both">Both — work it out from my sentence</string>
+    <string name="languages_both_sum">Watches the words you just typed and leans English or Tenglish to match</string>
+    <string name="languages_section_how">How it learns</string>
+    <string name="languages_how_body">Every word you type is remembered on this phone and tagged with the language of the sentence it was in, so your own Tenglish and English vocabulary comes back as suggestions and phrases. Nothing is uploaded and no model is downloaded.</string>
+    <string name="languages_ask_title">What do you type?</string>
+    <string name="languages_ask_body">Choose what the keyboard should expect. You can change this any time under Languages.</string>
+    <string name="languages_ask_ok">Continue</string>
 
     <!-- Typing -->
     <string name="typing_section_correction">Corrections</string>

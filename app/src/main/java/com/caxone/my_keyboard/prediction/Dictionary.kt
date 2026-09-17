@@ -3,10 +3,11 @@ package com.caxone.my_keyboard.prediction
 import android.content.Context
 
 /**
- * Built-in English dictionary: ~30k words with Zipf frequencies (x100) plus a small
+ * A built-in lexicon for one [language]: words with Zipf-style frequencies (x100) plus a small
  * seed of common bigrams so next-word prediction works before the user has typed anything.
+ * English ships ~30k words; Tenglish ships a few hundred everyday words and phrases.
  */
-class Dictionary(private val context: Context) {
+class Dictionary(private val context: Context, val language: Language = Language.ENGLISH) {
 
     private val frequency = HashMap<String, Int>(40_000)
     private var sorted: Array<String> = emptyArray()
@@ -21,7 +22,7 @@ class Dictionary(private val context: Context) {
     fun load() {
         if (isLoaded) return
         val words = ArrayList<String>(32_000)
-        context.assets.open("words.txt").bufferedReader().useLines { lines ->
+        context.assets.open(language.wordsAsset).bufferedReader().useLines { lines ->
             for (line in lines) {
                 val sp = line.indexOf(' ')
                 if (sp <= 0) continue
@@ -37,7 +38,7 @@ class Dictionary(private val context: Context) {
         words.sort()
         sorted = words.toTypedArray()
 
-        context.assets.open("bigrams.txt").bufferedReader().useLines { lines ->
+        context.assets.open(language.bigramsAsset).bufferedReader().useLines { lines ->
             for (line in lines) {
                 val parts = line.trim().split(' ')
                 if (parts.size != 3) continue

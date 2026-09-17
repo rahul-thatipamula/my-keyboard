@@ -20,7 +20,7 @@ import com.caxone.my_keyboard.media.MediaBar
 import com.caxone.my_keyboard.media.StickerPanel
 import com.caxone.my_keyboard.media.StickerSender
 import com.caxone.my_keyboard.media.StickerStore
-import com.caxone.my_keyboard.prediction.Dictionary
+import com.caxone.my_keyboard.prediction.LanguageEngine
 import com.caxone.my_keyboard.prediction.EditDistance
 import com.caxone.my_keyboard.prediction.GlideDecoder
 import com.caxone.my_keyboard.prediction.Predictor
@@ -30,7 +30,7 @@ import com.caxone.my_keyboard.theme.ThemeStore
 
 class KeyboardService : InputMethodService(), KeyboardView.Listener {
 
-    private lateinit var dictionary: Dictionary
+    private lateinit var dictionary: LanguageEngine
     private lateinit var userModel: UserModel
     private lateinit var predictor: Predictor
     private lateinit var glideDecoder: GlideDecoder
@@ -79,8 +79,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
 
     override fun onCreate() {
         super.onCreate()
-        dictionary = Dictionary(this)
         userModel = UserModel.get(this)
+        dictionary = LanguageEngine(this, userModel).also { it.mode = Prefs.languages(this) }
         predictor = Predictor(dictionary, userModel)
         glideDecoder = GlideDecoder(dictionary, userModel)
         Thread {
@@ -241,6 +241,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         capSentences = Prefs.autoCap(this) && cls == InputType.TYPE_CLASS_TEXT &&
             (inputType and InputType.TYPE_TEXT_FLAG_CAP_SENTENCES) != 0
 
+        dictionary.mode = Prefs.languages(this)
         keyboard.layout = if (numeric) Layouts.symbols() else lettersLayout()
         keyboard.shift = KeyboardView.ShiftState.OFF
         keyboard.enterLabel = enterLabelFor(info)
@@ -631,7 +632,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     private fun learn(word: String) {
         val w = word.lowercase()
         if (suggestionsOn && WORD_PATTERN.matches(w)) {
-            userModel.learn(prev2, prev1 ?: Predictor.SENTENCE_START, w)
+            userModel.learn(prev2, prev1 ?: Predictor.SENTENCE_START, w, dictionary.guessLanguage(w))
         }
     }
 
