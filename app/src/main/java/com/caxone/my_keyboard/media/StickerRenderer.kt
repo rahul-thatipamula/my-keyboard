@@ -3,25 +3,58 @@ package com.caxone.my_keyboard.media
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.ColorFilter
+import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffColorFilter
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
+import kotlin.math.cos
 import kotlin.math.min
+import kotlin.math.sin
 
-/** Draws a square sticker: an optional photo or solid colour, a rounded mask, and a caption. */
+/**
+ * Draws a square sticker: an optional photo (framed by zoom / pan, tinted by a colour filter,
+ * optionally outlined) over a solid or transparent background, then an emoji and a caption.
+ */
 object StickerRenderer {
 
     class Spec(
         val photo: Bitmap? = null,
         val background: Int = 0xFFFFC107.toInt(),
+        /** No fill behind the photo; with a cut-out this gives the classic die-cut sticker. */
+        val transparent: Boolean = false,
         val caption: String = "",
         val captionColor: Int = Color.WHITE,
-        val emoji: String = ""
+        val emoji: String = "",
+        /** 1 = the photo's short side fills the sticker. */
+        val zoom: Float = 1f,
+        /** Photo offset from centre as a fraction of the sticker size. */
+        val panX: Float = 0f,
+        val panY: Float = 0f,
+        val colorFilter: ColorFilter? = null,
+        /** Outline thickness as a fraction of the sticker size; 0 disables it. */
+        val outlineWidth: Float = 0f,
+        val outlineColor: Int = Color.WHITE
     )
+
+    /** Maps photo pixels to sticker pixels for a sticker [size] wide. */
+    fun photoMatrix(spec: Spec, size: Int): Matrix {
+        val m = Matrix()
+        val photo = spec.photo ?: return m
+        val scale = size / min(photo.width, photo.height).toFloat() * spec.zoom
+        m.postScale(scale, scale)
+        m.postTranslate(
+            (size - photo.width * scale) / 2f + spec.panX * size,
+            (size - photo.height * scale) / 2f + spec.panY * size
+        )
+        return m
+    }
 
     fun render(spec: Spec, size: Int = StickerStore.SIZE): Bitmap {
         val out = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
@@ -33,15 +66,15 @@ object StickerRenderer {
         canvas.save()
         canvas.clipPath(clip)
 
+        if (!spec.transparent) canvas.drawColor(spec.background)
+
         val photo = spec.photo
         if (photo != null) {
-            val scale = size / min(photo.width, photo.height).toFloat()
-            val w = photo.width * scale
-            val h = photo.height * scale
+            val matrix = photoMatrix(spec, size)
             val paint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
-            canvas.drawBitmap(photo, null, RectF((size - w) / 2, (size - h) / 2, (size + w) / 2, (size + h) / 2), paint)
-        } else {
-            canvas.drawColor(spec.background)
+            if (spec.outlineWidth > 0f) drawOutline(canvas, photo, matrix, spec.outlineWidth * size, spec.outlineColor)
+            paint.colorFilter = spec.colorFilter
+            canvas.drawBitmap(photo, matrix, paint)
         }
 
         if (spec.emoji.isNotEmpty()) {
@@ -84,6 +117,25 @@ object StickerRenderer {
         }
         canvas.restore()
         return out
+    }
+
+    /**
+     * A solid halo around the photo's opaque pixels: the photo is stamped in [color] at many
+     * offsets on a ring of radius [width] (and a smaller inner ring so the band is filled).
+     */
+    private fun drawOutline(canvas: Canvas, photo: Bitmap, matrix: Matrix, width: Float, color: Int) {
+        val paint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG).apply {
+            colorFilter = PorterDuffColorFilter(color, PorterDuff.Mode.SRC_IN)
+        }
+        val stamp = Matrix()
+        for ((radius, steps) in listOf(width to 24, width * 0.5f to 12)) {
+            for (i in 0 until steps) {
+                val a = i * 2.0 * Math.PI / steps
+                stamp.set(matrix)
+                stamp.postTranslate((radius * cos(a)).toFloat(), (radius * sin(a)).toFloat())
+                canvas.drawBitmap(photo, stamp, paint)
+            }
+        }
     }
 
     @Suppress("DEPRECATION")

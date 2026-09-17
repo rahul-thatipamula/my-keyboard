@@ -12,6 +12,7 @@ It requests exactly one permission — `VIBRATE`. There is no `INTERNET` permiss
 - **Glide typing** — slide across letters to spell a word; decoded on-device from the path's corners against the dictionary and your own vocabulary
 - **Media bar** under the keys with **Emoji** (built-in categorised set with recents), **GIF** (placeholder — no network by design) and **Stickers** tabs
 - **Custom stickers** made right from the keyboard (photo, emoji and/or caption), stored locally, and sent inline to any app that accepts images via `commitContent`, with a share-sheet fallback
+- **Sticker editor** with on-device **AI background removal** (MediaPipe image segmenter, bundled DeepLab v3 model — nothing is uploaded), erase / restore brushes, drag-and-pinch framing, rotate, flip, brightness / contrast / saturation, seven filters, a white or black die-cut outline and transparent backgrounds
 - **Autocorrect** using a damerau-style edit distance with an adaptive threshold by word length; skips words that look like names and anything already in your personal vocabulary
 - **Backspace undoes an autocorrect** and restores exactly what you typed
 - **Next-word prediction** blending a personal trigram/bigram model with a seeded dictionary (30k words, ~700 bigrams)
@@ -47,16 +48,19 @@ app/src/main/java/com/caxone/my_keyboard/
 │   ├── GifPanel.kt          # Placeholder
 │   ├── StickerPanel.kt      # Sticker grid + "+" tile
 │   ├── StickerStore.kt      # PNG files in private storage, FileProvider URIs
-│   ├── StickerRenderer.kt   # Photo / colour + emoji + outlined caption → bitmap
+│   ├── StickerRenderer.kt   # Photo (zoom / pan / filter / outline) + colour + emoji + caption → bitmap
+│   ├── PhotoEditor.kt       # Editable photo state: cut-out, brushes, rotate / flip, colour matrix
+│   ├── BackgroundRemover.kt # MediaPipe ImageSegmenter → soft alpha mask
 │   └── StickerSender.kt     # commitContent with share-sheet fallback
 ├── theme/
 │   ├── KeyboardTheme.kt     # Presets + custom theme derivation
 │   └── ThemeStore.kt        # Persists the chosen theme
 ├── settings/Prefs.kt        # SharedPreferences wrapper
-└── ui/                      # Home + Setup, Themes, Layout, Typing, Feedback, Stickers, StickerMaker, LearnedWords, About
+└── ui/                      # Home + Setup, Themes, Layout, Typing, Feedback, Stickers, StickerMaker (+ StickerCanvasView), LearnedWords, About
 app/src/main/assets/
 ├── words.txt                # 30,000 words with frequencies
-└── bigrams.txt              # Seed next-word pairs
+├── bigrams.txt              # Seed next-word pairs
+└── deeplab_v3.tflite        # Segmentation model for sticker background removal (2.7 MB, stored uncompressed)
 ```
 
 ## Requirements
@@ -108,6 +112,12 @@ The app's launcher activity opens a settings screen where you can choose a theme
 2. Corrections — dictionary and user words within an edit-distance bound that passes a cheap first/second-letter prefilter
 
 Each candidate is scored as `base(frequency, personal count) + context(trigram, bigram, seed) − penalties(length, edit distance)`. Autocorrect only fires when the typed word is unknown, the best candidate is strong, and the word doesn't look like a proper noun. All weights are plain constants in `Predictor.kt`, so tuning is a one-line change.
+
+## How sticker background removal works
+
+`BackgroundRemover` runs MediaPipe's `ImageSegmenter` with the bundled DeepLab v3 model and asks for confidence masks. The background class's confidence is inverted and passed through a soft threshold (`EDGE_LOW`/`EDGE_HIGH`) to make an `ALPHA_8` mask with feathered edges; `PhotoEditor.applyMask` multiplies it into the photo. If the model keeps under 1 % of the pixels the result is rejected rather than saving an empty sticker. The erase / restore brushes then edit the cut-out directly (clear pixels, or copy them back from the untouched source), with strokes mapped from the preview through the same matrix the renderer uses. Colour edits are a `ColorMatrix` applied at draw time, so they are always reversible.
+
+MediaPipe's library manifest requests `INTERNET` and `ACCESS_NETWORK_STATE`; the app manifest strips both with `tools:node="remove"`, so the merged APK still declares only `VIBRATE`. The native library adds roughly 10 MB per ABI; use ABI splits or an App Bundle for a slim release build.
 
 ## How phrase suggestions work
 
