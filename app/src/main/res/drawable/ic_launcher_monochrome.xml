@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Single-colour version for themed icons; the launcher tints it. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Row 1 -->
+    <path android:fillColor="#FFFFFF" android:pathData="M31,39.5h6a2,2 0 0 1 2,2v4a2,2 0 0 1 -2,2h-6a2,2 0 0 1 -2,-2v-4a2,2 0 0 1 2,-2z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M41.5,39.5h6a2,2 0 0 1 2,2v4a2,2 0 0 1 -2,2h-6a2,2 0 0 1 -2,-2v-4a2,2 0 0 1 2,-2z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M52,39.5h6a2,2 0 0 1 2,2v4a2,2 0 0 1 -2,2h-6a2,2 0 0 1 -2,-2v-4a2,2 0 0 1 2,-2z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M62.5,39.5h6a2,2 0 0 1 2,2v4a2,2 0 0 1 -2,2h-6a2,2 0 0 1 -2,-2v-4a2,2 0 0 1 2,-2z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M73,39.5h6a2,2 0 0 1 2,2v4a2,2 0 0 1 -2,2h-6a2,2 0 0 1 -2,-2v-4a2,2 0 0 1 2,-2z" />
+    <!-- Row 2 (offset half a key) -->
+    <path android:fillColor="#FFFFFF" android:pathData="M36.25,50h6a2,2 0 0 1 2,2v4a2,2 0 0 1 -2,2h-6a2,2 0 0 1 -2,-2v-4a2,2 0 0 1 2,-2z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M46.75,50h6a2,2 0 0 1 2,2v4a2,2 0 0 1 -2,2h-6a2,2 0 0 1 -2,-2v-4a2,2 0 0 1 2,-2z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M57.25,50h6a2,2 0 0 1 2,2v4a2,2 0 0 1 -2,2h-6a2,2 0 0 1 -2,-2v-4a2,2 0 0 1 2,-2z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M67.75,50h6a2,2 0 0 1 2,2v4a2,2 0 0 1 -2,2h-6a2,2 0 0 1 -2,-2v-4a2,2 0 0 1 2,-2z" />
+    <!-- Row 3: key, space bar, amber key -->
+    <path android:fillColor="#FFFFFF" android:pathData="M31,60.5h6a2,2 0 0 1 2,2v4a2,2 0 0 1 -2,2h-6a2,2 0 0 1 -2,-2v-4a2,2 0 0 1 2,-2z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M41.5,60.5h27a2,2 0 0 1 2,2v4a2,2 0 0 1 -2,2h-27a2,2 0 0 1 -2,-2v-4a2,2 0 0 1 2,-2z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M73,60.5h6a2,2 0 0 1 2,2v4a2,2 0 0 1 -2,2h-6a2,2 0 0 1 -2,-2v-4a2,2 0 0 1 2,-2z" />
+</vector>
