@@ -12,6 +12,7 @@ import com.caxone.my_keyboard.settings.Prefs
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.divider.MaterialDivider
+import com.google.android.material.radiobutton.MaterialRadioButton
 import com.google.android.material.switchmaterial.SwitchMaterial
 
 /**
@@ -95,6 +96,19 @@ abstract class BaseSettingsActivity : AppCompatActivity() {
         toggle.isChecked = Prefs.get(this).getBoolean(key, Prefs.default(key))
         toggle.setOnCheckedChangeListener { _, checked -> Prefs.set(this, key, checked) }
         row.setOnClickListener { toggle.toggle() }
+        return row
+    }
+
+    /** One choice in a single-select group; the caller keeps the radios in sync. */
+    fun radioRow(title: CharSequence, summary: CharSequence?, checked: Boolean, onClick: () -> Unit): View {
+        val row = LayoutInflater.from(this).inflate(R.layout.row_radio, content, false)
+        row.findViewById<TextView>(R.id.title).text = title
+        row.findViewById<TextView>(R.id.summary).apply {
+            text = summary
+            visibility = if (summary.isNullOrEmpty()) View.GONE else View.VISIBLE
+        }
+        row.findViewById<MaterialRadioButton>(R.id.radio).isChecked = checked
+        row.setOnClickListener { onClick() }
         return row
     }
 
