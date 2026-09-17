@@ -2,23 +2,50 @@
     <string name="app_name">My Keyboard</string>
     <string name="subtype_english">English (US)</string>
 
-    <string name="tagline">Themes you design, autocorrect that understands you, and next-word prediction that learns how you type.</string>
+    <!-- Home -->
+    <string name="tagline">Private, offline, and learns only from you.</string>
+    <string name="home_status_title">Keyboard status</string>
+    <string name="home_status_ready">Ready to use</string>
+    <string name="home_status_action">Finish setup</string>
+    <string name="home_preview_title">Preview</string>
+    <string name="section_customise">Customise</string>
+    <string name="section_data">Your data</string>
+    <string name="section_more">More</string>
+
+    <string name="nav_setup">Set up</string>
+    <string name="nav_setup_sum">Enable and select the keyboard</string>
+    <string name="nav_themes">Themes</string>
+    <string name="nav_themes_sum">%1$s · 8 presets and custom colours</string>
+    <string name="nav_typing">Typing</string>
+    <string name="nav_typing_sum">Autocorrect, prediction, glide typing, number row</string>
+    <string name="nav_feedback">Key press</string>
+    <string name="nav_feedback_sum">Popup, vibration, sound</string>
+    <string name="nav_learned">Learned words</string>
+    <string name="nav_learned_sum_none">Nothing learned yet</string>
+    <plurals name="nav_learned_sum">
+        <item quantity="one">%d word</item>
+        <item quantity="other">%d words</item>
+    </plurals>
+    <string name="nav_about">About</string>
+    <string name="nav_about_sum">Version, privacy, source code</string>
+
+    <!-- Setup -->
     <string name="step1_title">Step 1 · Enable My Keyboard</string>
     <string name="step1_body">Turn on My Keyboard in your phone\'s keyboard settings.</string>
     <string name="step1_button">Open keyboard settings</string>
     <string name="step2_title">Step 2 · Choose My Keyboard</string>
     <string name="step2_body">Pick My Keyboard as your current keyboard.</string>
     <string name="step2_button">Choose keyboard</string>
-    <string name="status_enabled">✓ Enabled</string>
+    <string name="status_enabled">Enabled</string>
     <string name="status_not_enabled">Not enabled yet</string>
-    <string name="status_selected">✓ Selected as current keyboard</string>
+    <string name="status_selected">Selected as current keyboard</string>
     <string name="status_not_selected">Not selected yet</string>
-
     <string name="try_title">Try it out</string>
     <string name="try_hint">Tap here and start typing…</string>
 
-    <string name="themes_title">Themes</string>
-    <string name="themes_body">Pick a preset or build your own below. Changes apply instantly.</string>
+    <!-- Themes -->
+    <string name="themes_body">Pick a preset or build your own. Changes apply instantly.</string>
+    <string name="presets_title">Presets</string>
     <string name="custom_title">Custom theme</string>
     <string name="custom_body">Choose your own colours for the keyboard.</string>
     <string name="custom_background">Background</string>
@@ -27,15 +54,48 @@
     <string name="custom_accent">Accent</string>
     <string name="custom_apply">Use custom theme</string>
 
-    <string name="typing_title">Typing</string>
+    <!-- Typing -->
+    <string name="typing_section_correction">Corrections</string>
+    <string name="typing_section_layout">Layout</string>
+    <string name="typing_section_input">Input</string>
     <string name="pref_autocorrect">Auto-correction</string>
     <string name="pref_autocorrect_sum">Fix misspelled words when you press space</string>
     <string name="pref_prediction">Next-word prediction</string>
     <string name="pref_prediction_sum">Suggest the next word, learned from your own typing</string>
+    <string name="pref_autocap">Auto-capitalisation</string>
+    <string name="pref_autocap_sum">Capitalise the first letter of each sentence</string>
+    <string name="pref_double_space">Double-space period</string>
+    <string name="pref_double_space_sum">Tap space twice to insert a full stop</string>
+    <string name="pref_glide">Glide typing</string>
+    <string name="pref_glide_sum">Slide your finger across the letters to type a word</string>
+    <string name="pref_number_row">Number row</string>
+    <string name="pref_number_row_sum">Show a row of digits above the letters</string>
+
+    <!-- Key press -->
     <string name="pref_popup">Key popup</string>
+    <string name="pref_popup_sum">Show the character above your finger as you type</string>
     <string name="pref_vibrate">Vibrate on keypress</string>
     <string name="pref_sound">Sound on keypress</string>
-    <string name="clear_learned">Clear learned words</string>
+
+    <!-- Learned words -->
+    <string name="learned_body">Words the keyboard has learned from your typing, most used first. They never leave this device.</string>
+    <string name="learned_search_hint">Search words</string>
+    <string name="learned_empty">Nothing learned yet. Words you type get added here.</string>
+    <string name="learned_count">Used %d times</string>
+    <string name="learned_count_one">Used once</string>
+    <string name="learned_delete">Forget word</string>
+    <string name="learned_deleted">Forgot “%s”</string>
+    <string name="reset_all">Reset all</string>
+    <string name="clear_learned">Reset learned words</string>
     <string name="clear_learned_confirm">This deletes everything the keyboard has learned from your typing. Continue?</string>
     <string name="clear_learned_done">Learned words cleared</string>
+
+    <!-- About -->
+    <string name="about_version">Version %s</string>
+    <string name="about_privacy_title">Privacy</string>
+    <string name="about_privacy_body">My Keyboard has no internet permission. Everything you type, and everything it learns, stays on this phone. There are no accounts, no analytics, and no cloud sync.</string>
+    <string name="about_permissions_title">Permissions</string>
+    <string name="about_permissions_body">Vibrate — only used for keypress feedback.</string>
+    <string name="about_source">View source on GitHub</string>
+    <string name="about_source_url" translatable="false">https://github.com/rahul-thatipamula/my-keyboard</string>
 </resources>
