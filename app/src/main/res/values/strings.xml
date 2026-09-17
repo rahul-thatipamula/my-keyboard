@@ -90,6 +90,31 @@
     <string name="clear_learned_confirm">This deletes everything the keyboard has learned from your typing. Continue?</string>
     <string name="clear_learned_done">Learned words cleared</string>
 
+    <!-- Stickers -->
+    <string name="nav_stickers">Stickers</string>
+    <string name="nav_stickers_sum_none">Make your own from a photo, emoji or text</string>
+    <plurals name="nav_stickers_sum">
+        <item quantity="one">%d sticker</item>
+        <item quantity="other">%d stickers</item>
+    </plurals>
+    <string name="stickers_body">Stickers live only on this phone. Send them from the keyboard\'s Stickers tab in any app that accepts images.</string>
+    <string name="stickers_empty">No stickers yet</string>
+    <string name="sticker_create">New sticker</string>
+    <string name="sticker_delete">Delete sticker</string>
+    <string name="sticker_delete_confirm">Remove this sticker from your phone?</string>
+    <string name="sticker_share">Share</string>
+    <string name="sticker_shared_fallback">This app can\'t take stickers directly, so a share sheet was opened instead.</string>
+    <string name="maker_title">New sticker</string>
+    <string name="maker_photo">Choose photo</string>
+    <string name="maker_photo_clear">Remove photo</string>
+    <string name="maker_caption_hint">Caption (optional)</string>
+    <string name="maker_emoji_hint">Emoji (optional)</string>
+    <string name="maker_background">Background</string>
+    <string name="maker_text_color">Text colour</string>
+    <string name="maker_save">Save sticker</string>
+    <string name="maker_saved">Sticker saved — find it in the Stickers tab</string>
+    <string name="maker_empty">Add a photo, an emoji or a caption first</string>
+
     <!-- About -->
     <string name="about_version">Version %s</string>
     <string name="about_privacy_title">Privacy</string>

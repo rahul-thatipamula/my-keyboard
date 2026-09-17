@@ -15,6 +15,7 @@ import com.caxone.my_keyboard.R
 import com.caxone.my_keyboard.keyboard.KeyboardView
 import com.caxone.my_keyboard.keyboard.Layouts
 import com.caxone.my_keyboard.keyboard.SuggestionStrip
+import com.caxone.my_keyboard.media.StickerStore
 import com.caxone.my_keyboard.prediction.UserModel
 import com.caxone.my_keyboard.settings.Prefs
 import com.caxone.my_keyboard.theme.ThemeStore
@@ -35,6 +36,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnStatusAction: MaterialButton
 
     private var themesSummary: TextView? = null
+    private var stickersSummary: TextView? = null
     private var learnedSummary: TextView? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -113,6 +115,7 @@ class MainActivity : AppCompatActivity() {
         )
         header(R.string.section_data)
         group(
+            nav(R.drawable.ic_sticker, R.string.nav_stickers, "") { open(StickersActivity::class.java) }.also { stickersSummary = it.findViewById(R.id.summary) },
             nav(R.drawable.ic_book, R.string.nav_learned, "") { open(LearnedWordsActivity::class.java) }.also { learnedSummary = it.findViewById(R.id.summary) }
         )
         header(R.string.section_more)
@@ -124,6 +127,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun refreshSummaries() {
         themesSummary?.text = getString(R.string.nav_themes_sum, ThemeStore.current(this).name)
+        val stickers = StickerStore.count(this)
+        stickersSummary?.text = if (stickers == 0) getString(R.string.nav_stickers_sum_none)
+        else resources.getQuantityString(R.plurals.nav_stickers_sum, stickers, stickers)
         val model = UserModel.get(this)
         val n = if (model.isLoaded) model.size() else 0
         learnedSummary?.text = if (n == 0) getString(R.string.nav_learned_sum_none)

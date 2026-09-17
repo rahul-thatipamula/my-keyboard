@@ -1,12 +1,25 @@
 package com.caxone.my_keyboard.keyboard
 
+import android.content.Intent
 import android.inputmethodservice.InputMethodService
 import android.text.InputType
 import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
+import android.view.ContextThemeWrapper
+import android.view.WindowManager
+import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
+import com.caxone.my_keyboard.R
+import com.caxone.my_keyboard.media.EmojiPanel
+import com.caxone.my_keyboard.media.GifPanel
+import com.caxone.my_keyboard.media.MediaBar
+import com.caxone.my_keyboard.media.StickerPanel
+import com.caxone.my_keyboard.media.StickerSender
+import com.caxone.my_keyboard.media.StickerStore
 import com.caxone.my_keyboard.prediction.Dictionary
 import com.caxone.my_keyboard.prediction.GlideDecoder
 import com.caxone.my_keyboard.prediction.Predictor
@@ -24,6 +37,11 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     private var root: LinearLayout? = null
     private lateinit var strip: SuggestionStrip
     private lateinit var keyboard: KeyboardView
+    private lateinit var panelHost: FrameLayout
+    private lateinit var mediaBar: MediaBar
+    private lateinit var emojiPanel: EmojiPanel
+    private lateinit var gifPanel: GifPanel
+    private lateinit var stickerPanel: StickerPanel
 
     /** The word currently being typed (underlined in the editor). */
     private val composing = StringBuilder()
@@ -71,11 +89,108 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         val container = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         strip = SuggestionStrip(this).also { it.onSuggestionClick = { i -> onSuggestionPicked(i) } }
         keyboard = KeyboardView(this).also { it.listener = this }
-        container.addView(strip, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
-        container.addView(keyboard, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+        panelHost = FrameLayout(this).apply { visibility = View.GONE }
+        mediaBar = MediaBar(this).also { it.onTabSelected = { tab -> showPanel(tab) } }
+
+        emojiPanel = EmojiPanel(this).apply {
+            onEmoji = { insertEmoji(it) }
+            onBack = { mediaBar.select(null) }
+            onBackspace = { handleDelete() }
+        }
+        gifPanel = GifPanel(this).apply {
+            onBack = { mediaBar.select(null) }
+            onBackspace = { handleDelete() }
+        }
+        stickerPanel = StickerPanel(this).apply {
+            onSticker = { sendSticker(it) }
+            onCreate = { openStickerMaker() }
+            onDeleteRequest = { confirmDeleteSticker(it) }
+            onBack = { mediaBar.select(null) }
+            onBackspace = { handleDelete() }
+        }
+
+        val wrap = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+        container.addView(strip, wrap)
+        container.addView(keyboard, wrap)
+        container.addView(panelHost, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+        container.addView(mediaBar, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (MediaBar.HEIGHT_DP * resources.displayMetrics.density).toInt()))
         root = container
         applyTheme()
         return container
+    }
+
+    // ---- media panels -----------------------------------------------------------------------
+
+    /** Swaps the keys for the chosen panel (or back to the keys when [tab] is null). */
+    private fun showPanel(tab: MediaBar.Tab?) {
+        if (composing.isNotEmpty()) commitComposing(false)
+        panelHost.removeAllViews()
+        if (tab == null) {
+            panelHost.visibility = View.GONE
+            keyboard.visibility = View.VISIBLE
+            strip.visibility = if (suggestionsOn) View.VISIBLE else View.GONE
+            refreshSuggestions()
+            return
+        }
+        val panel = when (tab) {
+            MediaBar.Tab.EMOJI -> emojiPanel.also { it.refresh() }
+            MediaBar.Tab.GIF -> gifPanel
+            MediaBar.Tab.STICKERS -> stickerPanel.also { it.refresh() }
+        }
+        val height = keyboard.height + (if (strip.visibility == View.VISIBLE) strip.height else 0)
+        val fallback = (300 * resources.displayMetrics.density).toInt()
+        panelHost.addView(panel, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, if (height > 0) height else fallback))
+        keyboard.visibility = View.GONE
+        strip.visibility = View.GONE
+        panelHost.visibility = View.VISIBLE
+    }
+
+    private fun closePanel() {
+        if (mediaBar.selected != null) {
+            mediaBar.reset()
+            showPanel(null)
+        }
+    }
+
+    private fun insertEmoji(emoji: String) {
+        val ic = currentInputConnection ?: return
+        if (composing.isNotEmpty()) commitComposing(false)
+        ic.commitText(emoji, 1)
+        lastAutoCorrect = null
+        lastKeyWasSpace = false
+    }
+
+    private fun sendSticker(file: java.io.File) {
+        val uri = StickerStore.uri(this, file)
+        val inline = StickerSender.send(this, currentInputConnection, currentInputEditorInfo, uri)
+        if (!inline) Toast.makeText(this, R.string.sticker_shared_fallback, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun openStickerMaker() {
+        val intent = Intent(this, com.caxone.my_keyboard.ui.StickerMakerActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        startActivity(intent)
+    }
+
+    private fun confirmDeleteSticker(file: java.io.File) {
+        val themed = ContextThemeWrapper(this, R.style.Theme_Mykeyboard)
+        val dialog = AlertDialog.Builder(themed)
+            .setTitle(R.string.sticker_delete)
+            .setMessage(R.string.sticker_delete_confirm)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                StickerStore.delete(file)
+                stickerPanel.refresh()
+            }
+            .create()
+        // Dialogs from an IME must be attached to the keyboard window.
+        dialog.window?.let { w ->
+            w.attributes.token = keyboard.windowToken
+            @Suppress("DEPRECATION")
+            w.setType(WindowManager.LayoutParams.TYPE_APPLICATION_ATTACHED_DIALOG)
+            w.addFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM)
+        }
+        dialog.show()
     }
 
     override fun onEvaluateFullscreenMode(): Boolean = false
@@ -84,6 +199,10 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         val theme = ThemeStore.current(this)
         keyboard.theme = theme
         strip.applyTheme(theme)
+        mediaBar.applyTheme(theme)
+        emojiPanel.applyTheme(theme)
+        gifPanel.applyTheme(theme)
+        stickerPanel.applyTheme(theme)
         root?.setBackgroundColor(theme.background)
         keyboard.showPreview = Prefs.keyPopup(this)
         keyboard.hapticEnabled = Prefs.vibrate(this)
@@ -122,6 +241,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         keyboard.shift = KeyboardView.ShiftState.OFF
         keyboard.enterLabel = enterLabelFor(info)
         strip.visibility = if (suggestionsOn) View.VISIBLE else View.GONE
+        closePanel()
 
         seedContextFromEditor()
         updateShift()
@@ -131,6 +251,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     override fun onFinishInputView(finishingInput: Boolean) {
         currentInputConnection?.finishComposingText()
         composing.setLength(0)
+        closePanel()
         super.onFinishInputView(finishingInput)
     }
 

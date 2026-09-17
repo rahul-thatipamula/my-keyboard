@@ -43,7 +43,7 @@ class SetupActivity : BaseSettingsActivity() {
                 android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE or
                 android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES or
                 android.text.InputType.TYPE_TEXT_FLAG_AUTO_CORRECT
-            importantForAutofill = android.view.View.IMPORTANT_FOR_AUTOFILL_NO
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) importantForAutofill = android.view.View.IMPORTANT_FOR_AUTOFILL_NO
         }
         card(edit)
     }
