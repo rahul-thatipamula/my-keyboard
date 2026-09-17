@@ -54,6 +54,9 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     private var result: Predictor.Result? = null
     private var nextWords: List<String> = emptyList()
 
+    /** Per strip slot, the words the model expects after that suggestion (empty = just the word). */
+    private var phraseTails: List<List<String>> = emptyList()
+
     /** Set right after an autocorrect so a single backspace can undo it. */
     private class AutoCorrectRecord(val typed: String, val committed: String, val prev2: String?, val prev1: String?)
     private var lastAutoCorrect: AutoCorrectRecord? = null
@@ -333,14 +336,30 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         if (composing.isEmpty()) {
             result = null
             nextWords = if (Prefs.prediction(this)) predictor.nextWords(prev2, prev1) else emptyList()
-            strip.setSuggestions(nextWords.map { caseForNext(it) }, -1)
+            phraseTails = phraseTailsFor(nextWords, prev1)
+            strip.setSuggestions(nextWords.mapIndexed { i, w -> withTail(caseForNext(w), i) }, -1)
         } else {
             val typed = composing.toString()
             val g = glideResult
             val r = if (g != null && composingFromGlide) g else predictor.forComposing(typed, prev2, prev1, Prefs.autocorrect(this))
             result = r
-            strip.setSuggestions(r.words.map { applyCase(it, typed) }, if (r.autoCorrect) r.primary else -1)
+            phraseTails = phraseTailsFor(r.words, prev1)
+            strip.setSuggestions(r.words.mapIndexed { i, w -> withTail(applyCase(w, typed), i) }, if (r.autoCorrect) r.primary else -1)
         }
+    }
+
+    /** Extends each suggested word into a phrase where the personal model is confident. */
+    private fun phraseTailsFor(words: List<String>, prev1: String?): List<List<String>> {
+        if (!Prefs.prediction(this) || !Prefs.phrases(this)) return emptyList()
+        return words.map { predictor.phraseAfter(prev1, it) }
+    }
+
+    private fun tail(index: Int): List<String> = phraseTails.getOrNull(index) ?: emptyList()
+
+    private fun withTail(head: String, index: Int): String {
+        if (head.isEmpty()) return head
+        val t = tail(index)
+        return if (t.isEmpty()) head else head + " " + t.joinToString(" ") { fixPronounI(it) }
     }
 
     /** Matches a suggestion's case to what the user typed (e.g. "Hel" -> "Hello", "HEL" -> "HELLO"). */
@@ -565,16 +584,13 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             val word = r.words.getOrNull(index)?.takeIf { it.isNotEmpty() } ?: return
             val typed = composing.toString()
             val out = applyCase(word, typed)
-            ic.commitText("$out ", 1)
             composing.setLength(0)
             clearGlide()
             lastAutoCorrect = null
-            learnAndPush(out)
+            commitPhrase(ic, out, tail(index))
         } else {
             val word = nextWords.getOrNull(index)?.takeIf { it.isNotEmpty() } ?: return
-            val out = caseForNext(word)
-            ic.commitText("$out ", 1)
-            learnAndPush(out)
+            commitPhrase(ic, caseForNext(word), tail(index))
         }
         if (keyboard.shift == KeyboardView.ShiftState.ON) keyboard.shift = KeyboardView.ShiftState.OFF
         lastKeyWasSpace = false
@@ -583,6 +599,17 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     }
 
     // ---- committing & learning ----------------------------------------------------------------
+
+    /** Commits [head] plus any phrase [tail] as separate words so each one is learned in context. */
+    private fun commitPhrase(ic: InputConnection, head: String, tail: List<String>) {
+        ic.commitText("$head ", 1)
+        learnAndPush(head)
+        for (w in tail) {
+            val out = fixPronounI(w)
+            ic.commitText("$out ", 1)
+            learnAndPush(out)
+        }
+    }
 
     private fun commitComposing(allowAutoCorrect: Boolean) {
         val ic = currentInputConnection ?: return

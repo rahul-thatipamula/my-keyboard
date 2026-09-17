@@ -9,6 +9,8 @@ import kotlin.math.max
  */
 class Predictor(private val dictionary: Dictionary, private val user: UserModel) {
 
+    private val phrases = PhraseBuilder(user::after, user::after)
+
     /**
      * [words] always has three entries (may be empty strings). [primary] is the index of the
      * word that will be committed on space; [autoCorrect] tells whether that differs from what was typed.
@@ -33,6 +35,13 @@ class Predictor(private val dictionary: Dictionary, private val user: UserModel)
         }
         return scores.entries.sortedByDescending { it.value }.take(3).map { it.key }
     }
+
+    /**
+     * Words the user model confidently expects after [word] (which follows [prev1]), so a
+     * suggestion can be shown and committed as a phrase. Empty when the model is unsure.
+     */
+    fun phraseAfter(prev1: String?, word: String): List<String> =
+        if (word.isEmpty()) emptyList() else phrases.extend(prev1, word.lowercase())
 
     // ---- composing --------------------------------------------------------------------------
 
@@ -134,5 +143,13 @@ class Predictor(private val dictionary: Dictionary, private val user: UserModel)
 
     companion object {
         const val SENTENCE_START = "<s>"
+
+        /** Phrase suggestions: how far to extend a word and how sure the model must be. */
+        const val PHRASE_MAX_EXTRA = 3
+        const val PHRASE_MAX_CHARS = 26
+        /** A follower must have been typed this often in its context before it is offered. */
+        const val PHRASE_MIN_COUNT = 2
+        /** …and must account for at least this share of everything typed in that context. */
+        const val PHRASE_DOMINANCE = 0.5
     }
 }

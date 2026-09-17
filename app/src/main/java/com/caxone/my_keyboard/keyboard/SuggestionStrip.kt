@@ -2,6 +2,7 @@ package com.caxone.my_keyboard.keyboard
 
 import android.content.Context
 import android.graphics.Typeface
+import android.text.TextUtils
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
@@ -36,6 +37,7 @@ class SuggestionStrip(context: Context) : LinearLayout(context) {
                 gravity = Gravity.CENTER
                 setSingleLine(true)
                 maxLines = 1
+                ellipsize = TextUtils.TruncateAt.END
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
                 setPadding((8 * density).toInt(), 0, (8 * density).toInt(), 0)
                 setBackgroundResource(ripple.resourceId)
@@ -54,15 +56,22 @@ class SuggestionStrip(context: Context) : LinearLayout(context) {
         for (d in dividers) d.setBackgroundColor(theme.hintText and 0x60FFFFFF)
     }
 
-    /** Shows up to three [words]; [highlight] is bolded to show it will be committed on space. */
+    /**
+     * Shows up to three [words]; [highlight] is bolded to show it will be committed on space.
+     * A multi-word phrase gets a wider slot so it is not cut short.
+     */
     fun setSuggestions(words: List<String>, highlight: Int) {
         for (i in slots.indices) {
             val tv = slots[i]
-            tv.text = words.getOrNull(i) ?: ""
+            val text = words.getOrNull(i) ?: ""
+            tv.text = text
             val strong = i == highlight
             tv.typeface = if (strong) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
             tv.setTextColor(if (strong) theme.accent else theme.suggestionText)
+            val wordCount = if (text.isEmpty()) 1 else text.count { it == ' ' } + 1
+            (tv.layoutParams as LayoutParams).weight = 1f + 0.5f * (wordCount - 1).coerceAtMost(3)
         }
+        requestLayout()
     }
 
     fun clear() = setSuggestions(emptyList(), -1)

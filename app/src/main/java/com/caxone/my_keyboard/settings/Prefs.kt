@@ -10,6 +10,7 @@ object Prefs {
 
     const val KEY_AUTOCORRECT = "autocorrect"
     const val KEY_PREDICTION = "prediction"
+    const val KEY_PHRASES = "phrase_prediction"
     const val KEY_GLIDE = "glide"
     const val KEY_NUMBER_ROW = "number_row"
     const val KEY_LAYOUT = "layout"
@@ -24,6 +25,7 @@ object Prefs {
 
     fun autocorrect(context: Context) = get(context).getBoolean(KEY_AUTOCORRECT, true)
     fun prediction(context: Context) = get(context).getBoolean(KEY_PREDICTION, true)
+    fun phrases(context: Context) = get(context).getBoolean(KEY_PHRASES, true)
     fun glide(context: Context) = get(context).getBoolean(KEY_GLIDE, true)
     fun numberRow(context: Context) = get(context).getBoolean(KEY_NUMBER_ROW, false)
     fun layout(context: Context): LetterLayout = LetterLayout.fromId(get(context).getString(KEY_LAYOUT, null))

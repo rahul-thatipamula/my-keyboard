@@ -17,6 +17,7 @@ class TypingActivity : BaseSettingsActivity() {
         card(
             switchRow(R.string.pref_autocorrect, R.string.pref_autocorrect_sum, Prefs.KEY_AUTOCORRECT),
             switchRow(R.string.pref_prediction, R.string.pref_prediction_sum, Prefs.KEY_PREDICTION),
+            switchRow(R.string.pref_phrases, R.string.pref_phrases_sum, Prefs.KEY_PHRASES),
             switchRow(R.string.pref_autocap, R.string.pref_autocap_sum, Prefs.KEY_AUTOCAP),
             switchRow(R.string.pref_double_space, R.string.pref_double_space_sum, Prefs.KEY_DOUBLE_SPACE)
         )
