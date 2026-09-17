@@ -19,7 +19,7 @@
     <string name="nav_layout">Keyboard layout</string>
     <string name="nav_layout_sum">%1$s · QWERTZ, AZERTY, Dvorak, Colemak, Workman</string>
     <string name="nav_typing">Typing</string>
-    <string name="nav_typing_sum">Autocorrect, prediction, glide typing, number row</string>
+    <string name="nav_typing_sum">Autocorrect, phrases, glide typing, number row</string>
     <string name="nav_feedback">Key press</string>
     <string name="nav_feedback_sum">Popup, vibration, sound</string>
     <string name="nav_learned">Learned words</string>
@@ -64,6 +64,8 @@
     <string name="pref_autocorrect_sum">Fix misspelled words when you press space</string>
     <string name="pref_prediction">Next-word prediction</string>
     <string name="pref_prediction_sum">Suggest the next word, learned from your own typing</string>
+    <string name="pref_phrases">Phrase suggestions</string>
+    <string name="pref_phrases_sum">Offer several words at once when the keyboard is sure what you\'ll type next</string>
     <string name="pref_autocap">Auto-capitalisation</string>
     <string name="pref_autocap_sum">Capitalise the first letter of each sentence</string>
     <string name="pref_double_space">Double-space period</string>

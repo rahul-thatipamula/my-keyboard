@@ -15,11 +15,12 @@ It requests exactly one permission — `VIBRATE`. There is no `INTERNET` permiss
 - **Autocorrect** using a damerau-style edit distance with an adaptive threshold by word length; skips words that look like names and anything already in your personal vocabulary
 - **Backspace undoes an autocorrect** and restores exactly what you typed
 - **Next-word prediction** blending a personal trigram/bigram model with a seeded dictionary (30k words, ~700 bigrams)
+- **Phrase suggestions** — each suggestion grows into several words ("you doing today") whenever your own typing history makes the continuation clear; one tap commits the whole phrase
 - **On-device personal language model** stored in a plain SQLite file (`user_model.db`) — inspectable, backup-able, and wipeable from settings
 - **8 preset themes** (Light, Dark, Midnight, Ocean, Sunset, Forest, Rose, Lavender) plus a **custom theme** derived from four colours you pick
 - **Multi-screen settings app**: Set up · Themes · Layout · Typing · Key press · Stickers · Learned words · About
 - **Learned words screen** — see every word the model has learned with its count, forget words one at a time, or reset everything
-- Toggles for autocorrect, prediction, glide, number row, auto-capitalisation, double-space period, key popups, vibration and sound
+- Toggles for autocorrect, prediction, phrase suggestions, glide, number row, auto-capitalisation, double-space period, key popups, vibration and sound
 - Smart shift (auto-capitalisation at sentence start), double-space period, `i` → `I`
 - No accounts, no Play Services, no background process — works on de-Googled ROMs
 
@@ -35,6 +36,7 @@ app/src/main/java/com/caxone/my_keyboard/
 │   └── SuggestionStrip.kt   # Three-slot suggestion bar
 ├── prediction/
 │   ├── Predictor.kt         # Scores completions, corrections and next words
+│   ├── PhraseBuilder.kt     # Extends a suggestion into a phrase while the user model is confident
 │   ├── GlideDecoder.kt      # Turns a glide path into word candidates
 │   ├── Dictionary.kt        # Loads words.txt / bigrams.txt from assets
 │   ├── UserModel.kt         # Personal unigram/bigram/trigram model backed by SQLite
@@ -106,6 +108,10 @@ The app's launcher activity opens a settings screen where you can choose a theme
 2. Corrections — dictionary and user words within an edit-distance bound that passes a cheap first/second-letter prefilter
 
 Each candidate is scored as `base(frequency, personal count) + context(trigram, bigram, seed) − penalties(length, edit distance)`. Autocorrect only fires when the typed word is unknown, the best candidate is strong, and the word doesn't look like a proper noun. All weights are plain constants in `Predictor.kt`, so tuning is a one-line change.
+
+## How phrase suggestions work
+
+After the next-word candidates are ranked, `PhraseBuilder` asks the personal model what usually follows each one — first by trigram (the two words before), then by bigram. A follower is appended only when it has been typed at least `PHRASE_MIN_COUNT` times in that context *and* accounts for at least `PHRASE_DOMINANCE` of everything typed there; the walk stops at the first uncertain step, at `PHRASE_MAX_EXTRA` words, or at `PHRASE_MAX_CHARS`. The seed dictionary is deliberately not used, so phrases only ever reflect what you actually write. The strip widens a slot to fit a phrase, and tapping it commits every word (each learned in context). Autocorrect on space still commits a single word.
 
 ## License
 
