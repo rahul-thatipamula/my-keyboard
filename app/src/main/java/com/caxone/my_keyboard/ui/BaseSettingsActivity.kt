@@ -52,6 +52,15 @@ abstract class BaseSettingsActivity : AppCompatActivity() {
         return tv
     }
 
+    /** A section whose card can be folded away; the state is shared under [prefKey]. */
+    fun collapsibleCard(titleRes: Int, prefKey: String, vararg rows: View): MaterialCardView {
+        val header = LayoutInflater.from(this).inflate(R.layout.row_collapsible_header, content, false)
+        content.addView(header)
+        val card = card(*rows)
+        Collapsible.bind(header, card, titleRes, prefKey)
+        return card
+    }
+
     fun paragraph(textRes: Int): TextView = paragraph(getString(textRes))
 
     fun paragraph(text: CharSequence): TextView {

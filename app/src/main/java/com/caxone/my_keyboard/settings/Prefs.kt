@@ -19,6 +19,7 @@ object Prefs {
     const val KEY_POPUP = "key_popup"
     const val KEY_VIBRATE = "vibrate"
     const val KEY_SOUND = "sound"
+    const val KEY_PREVIEW_COLLAPSED = "preview_collapsed"
 
     fun get(context: Context): SharedPreferences =
         context.getSharedPreferences(NAME, Context.MODE_PRIVATE)
@@ -37,7 +38,7 @@ object Prefs {
 
     /** Default for any boolean key, used by the settings screens. */
     fun default(key: String): Boolean = when (key) {
-        KEY_NUMBER_ROW, KEY_SOUND -> false
+        KEY_NUMBER_ROW, KEY_SOUND, KEY_PREVIEW_COLLAPSED -> false
         else -> true
     }
 

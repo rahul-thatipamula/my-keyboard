@@ -8,6 +8,8 @@
     <string name="home_status_ready">Ready to use</string>
     <string name="home_status_action">Finish setup</string>
     <string name="home_preview_title">Preview</string>
+    <string name="collapsible_hide">Hide</string>
+    <string name="collapsible_show">Show</string>
     <string name="section_customise">Customise</string>
     <string name="section_data">Your data</string>
     <string name="section_more">More</string>
