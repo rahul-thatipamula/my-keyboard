@@ -21,6 +21,7 @@ import com.caxone.my_keyboard.media.StickerPanel
 import com.caxone.my_keyboard.media.StickerSender
 import com.caxone.my_keyboard.media.StickerStore
 import com.caxone.my_keyboard.prediction.Dictionary
+import com.caxone.my_keyboard.prediction.EditDistance
 import com.caxone.my_keyboard.prediction.GlideDecoder
 import com.caxone.my_keyboard.prediction.Predictor
 import com.caxone.my_keyboard.prediction.UserModel
@@ -276,7 +277,12 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         }
     }
 
-    private fun lettersLayout(): Layout = Layouts.qwerty(Prefs.numberRow(this))
+    /** Builds the letter layout the user picked and points autocorrect's adjacency map at it. */
+    private fun lettersLayout(): Layout {
+        val layout = Prefs.layout(this)
+        EditDistance.useLayout(Layouts.letterPositions(layout))
+        return Layouts.letters(layout, Prefs.numberRow(this))
+    }
 
     private fun enterLabelFor(info: EditorInfo): String {
         if ((info.imeOptions and EditorInfo.IME_FLAG_NO_ENTER_ACTION) != 0) return "↵"

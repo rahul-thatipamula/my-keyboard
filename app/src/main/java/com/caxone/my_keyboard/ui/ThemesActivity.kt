@@ -94,7 +94,7 @@ class ThemesActivity : BaseSettingsActivity() {
     private fun refreshPreview() {
         val theme = ThemeStore.current(this)
         previewKeyboard.theme = theme
-        previewKeyboard.layout = Layouts.qwerty(Prefs.numberRow(this))
+        previewKeyboard.layout = Layouts.letters(Prefs.layout(this), Prefs.numberRow(this))
         previewStrip.applyTheme(theme)
         previewStrip.setSuggestions(listOf("Hello", "Hey", "How"), -1)
     }

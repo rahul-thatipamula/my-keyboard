@@ -11,25 +11,39 @@ import kotlin.math.min
 object EditDistance {
 
     private const val ROWS_QWERTY = "qwertyuiop|asdfghjkl|zxcvbnm"
-    private val neighbours = HashMap<Char, Set<Char>>()
 
-    init {
+    @Volatile
+    private var neighbours: Map<Char, Set<Char>> = build(qwertyPositions())
+
+    /** Standard QWERTY, used until the keyboard installs the layout the user picked. */
+    private fun qwertyPositions(): Map<Char, Pair<Int, Float>> {
         val rows = ROWS_QWERTY.split('|')
-        val offsets = doubleArrayOf(0.0, 0.5, 1.5)
-        for (r in rows.indices) {
-            for (c in rows[r].indices) {
-                val set = HashSet<Char>()
-                val x = c + offsets[r]
-                for (r2 in rows.indices) {
-                    for (c2 in rows[r2].indices) {
-                        if (r == r2 && c == c2) continue
-                        val x2 = c2 + offsets[r2]
-                        if (abs(r - r2) <= 1 && abs(x - x2) <= 1.0) set.add(rows[r2][c2])
-                    }
-                }
-                neighbours[rows[r][c]] = set
+        val offsets = floatArrayOf(0f, 0.5f, 1.5f)
+        val positions = HashMap<Char, Pair<Int, Float>>()
+        for (r in rows.indices) for (c in rows[r].indices) positions[rows[r][c]] = r to c + offsets[r] + 0.5f
+        return positions
+    }
+
+    /**
+     * Rebuilds the neighbour map for a letter layout. [positions] maps each character to its
+     * (row, horizontal centre in key widths); two keys are neighbours when they sit on the same
+     * or an adjacent row and within one key width of each other.
+     */
+    fun useLayout(positions: Map<Char, Pair<Int, Float>>) {
+        neighbours = build(positions)
+    }
+
+    private fun build(positions: Map<Char, Pair<Int, Float>>): Map<Char, Set<Char>> {
+        val map = HashMap<Char, Set<Char>>()
+        for ((a, pa) in positions) {
+            val set = HashSet<Char>()
+            for ((b, pb) in positions) {
+                if (a == b) continue
+                if (abs(pa.first - pb.first) <= 1 && abs(pa.second - pb.second) <= 1.0f) set.add(b)
             }
+            map[a] = set
         }
+        return map
     }
 
     fun adjacent(a: Char, b: Char): Boolean = neighbours[a]?.contains(b) == true

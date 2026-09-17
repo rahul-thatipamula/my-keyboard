@@ -42,7 +42,7 @@ class KeyboardView @JvmOverloads constructor(context: Context, attrs: AttributeS
     var theme: KeyboardTheme = KeyboardTheme.LIGHT
         set(value) { field = value; invalidate() }
 
-    var layout: Layout = Layouts.qwerty()
+    var layout: Layout = Layouts.letters()
         set(value) { field = value; geometryDirty = true; requestLayout(); invalidate() }
 
     var shift: ShiftState = ShiftState.OFF
@@ -119,16 +119,18 @@ class KeyboardView @JvmOverloads constructor(context: Context, attrs: AttributeS
     }
 
     private fun computeGeometry() {
-        val unit = (width - 2 * padH) / 10f
+        val unit = (width - 2 * padH) / Layouts.ROW_UNITS
         var y = padTop
         for (row in layout.rows) {
             val total = row.sumOf { it.width.toDouble() }.toFloat()
             val rh = rowHeight(row)
-            var x = padH + (10f - total) / 2f * unit
+            // Rows wider than the grid (Dvorak's bottom row) get slimmer keys instead of overflowing.
+            val rowUnit = if (total > Layouts.ROW_UNITS) unit * Layouts.ROW_UNITS / total else unit
+            var x = padH + maxOf(0f, Layouts.ROW_UNITS - total) / 2f * unit
             for (key in row) {
                 key.x = x
                 key.y = y
-                key.w = key.width * unit
+                key.w = key.width * rowUnit
                 key.h = rh
                 x += key.w
             }

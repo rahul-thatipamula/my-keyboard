@@ -36,6 +36,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnStatusAction: MaterialButton
 
     private var themesSummary: TextView? = null
+    private var layoutSummary: TextView? = null
     private var stickersSummary: TextView? = null
     private var learnedSummary: TextView? = null
 
@@ -99,7 +100,7 @@ class MainActivity : AppCompatActivity() {
     private fun refreshPreview() {
         val theme = ThemeStore.current(this)
         previewKeyboard.theme = theme
-        previewKeyboard.layout = Layouts.qwerty(Prefs.numberRow(this))
+        previewKeyboard.layout = Layouts.letters(Prefs.layout(this), Prefs.numberRow(this))
         previewStrip.applyTheme(theme)
         previewStrip.setSuggestions(listOf("Hello", "Hey", "How"), -1)
     }
@@ -110,6 +111,7 @@ class MainActivity : AppCompatActivity() {
         header(R.string.section_customise)
         group(
             nav(R.drawable.ic_palette, R.string.nav_themes, "") { open(ThemesActivity::class.java) }.also { themesSummary = it.findViewById(R.id.summary) },
+            nav(R.drawable.ic_keyboard, R.string.nav_layout, "") { open(LayoutActivity::class.java) }.also { layoutSummary = it.findViewById(R.id.summary) },
             nav(R.drawable.ic_spellcheck, R.string.nav_typing, getString(R.string.nav_typing_sum)) { open(TypingActivity::class.java) },
             nav(R.drawable.ic_vibration, R.string.nav_feedback, getString(R.string.nav_feedback_sum)) { open(FeedbackActivity::class.java) }
         )
@@ -127,6 +129,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun refreshSummaries() {
         themesSummary?.text = getString(R.string.nav_themes_sum, ThemeStore.current(this).name)
+        layoutSummary?.text = getString(R.string.nav_layout_sum, Prefs.layout(this).displayName)
         val stickers = StickerStore.count(this)
         stickersSummary?.text = if (stickers == 0) getString(R.string.nav_stickers_sum_none)
         else resources.getQuantityString(R.plurals.nav_stickers_sum, stickers, stickers)

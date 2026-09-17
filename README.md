@@ -6,7 +6,8 @@ It requests exactly one permission — `VIBRATE`. There is no `INTERNET` permiss
 
 ## Features
 
-- **QWERTY, symbols and secondary-symbols layouts** with long-press hints and key preview popups
+- **Six letter layouts** — QWERTY, QWERTZ, AZERTY, Dvorak, Colemak and Workman — chosen from a Layout screen with a live preview; autocorrect and glide adjacency follow whichever is active
+- **Symbols and secondary-symbols pages** with long-press hints and key preview popups
 - **Optional number row** above the letters; symbol pages carry long-press alternates (superscripts, currency, quotes, brackets)
 - **Glide typing** — slide across letters to spell a word; decoded on-device from the path's corners against the dictionary and your own vocabulary
 - **Media bar** under the keys with **Emoji** (built-in categorised set with recents), **GIF** (placeholder — no network by design) and **Stickers** tabs
@@ -16,7 +17,7 @@ It requests exactly one permission — `VIBRATE`. There is no `INTERNET` permiss
 - **Next-word prediction** blending a personal trigram/bigram model with a seeded dictionary (30k words, ~700 bigrams)
 - **On-device personal language model** stored in a plain SQLite file (`user_model.db`) — inspectable, backup-able, and wipeable from settings
 - **8 preset themes** (Light, Dark, Midnight, Ocean, Sunset, Forest, Rose, Lavender) plus a **custom theme** derived from four colours you pick
-- **Multi-screen settings app**: Set up · Themes · Typing · Key press · Stickers · Learned words · About
+- **Multi-screen settings app**: Set up · Themes · Layout · Typing · Key press · Stickers · Learned words · About
 - **Learned words screen** — see every word the model has learned with its count, forget words one at a time, or reset everything
 - Toggles for autocorrect, prediction, glide, number row, auto-capitalisation, double-space period, key popups, vibration and sound
 - Smart shift (auto-capitalisation at sentence start), double-space period, `i` → `I`
@@ -29,14 +30,15 @@ app/src/main/java/com/caxone/my_keyboard/
 ├── keyboard/
 │   ├── KeyboardService.kt   # InputMethodService: composing, commit, learn, undo, glide, panels
 │   ├── KeyboardView.kt      # Draws keys, handles touch, captures glide paths
-│   ├── Layouts.kt           # QWERTY (± number row) / symbols key definitions
+│   ├── LetterLayout.kt      # QWERTY / QWERTZ / AZERTY / Dvorak / Colemak / Workman rows
+│   ├── Layouts.kt           # Builds letter (± number row) and symbol key grids
 │   └── SuggestionStrip.kt   # Three-slot suggestion bar
 ├── prediction/
 │   ├── Predictor.kt         # Scores completions, corrections and next words
 │   ├── GlideDecoder.kt      # Turns a glide path into word candidates
 │   ├── Dictionary.kt        # Loads words.txt / bigrams.txt from assets
 │   ├── UserModel.kt         # Personal unigram/bigram/trigram model backed by SQLite
-│   └── EditDistance.kt      # Bounded edit distance with keyboard-adjacency awareness
+│   └── EditDistance.kt      # Bounded edit distance; adjacency map rebuilt for the chosen layout
 ├── media/
 │   ├── MediaBar.kt          # Emoji / GIF / Stickers tab bar under the keys
 │   ├── EmojiPanel.kt, EmojiData.kt
@@ -49,7 +51,7 @@ app/src/main/java/com/caxone/my_keyboard/
 │   ├── KeyboardTheme.kt     # Presets + custom theme derivation
 │   └── ThemeStore.kt        # Persists the chosen theme
 ├── settings/Prefs.kt        # SharedPreferences wrapper
-└── ui/                      # Home + Setup, Themes, Typing, Feedback, Stickers, StickerMaker, LearnedWords, About
+└── ui/                      # Home + Setup, Themes, Layout, Typing, Feedback, Stickers, StickerMaker, LearnedWords, About
 app/src/main/assets/
 ├── words.txt                # 30,000 words with frequencies
 └── bigrams.txt              # Seed next-word pairs
