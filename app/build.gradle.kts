@@ -14,8 +14,8 @@ android {
         applicationId = "com.caxone.my_keyboard"
         minSdk = 24
         targetSdk = 36
-        versionCode = 4
-        versionName = "1.3"
+        versionCode = 5
+        versionName = "1.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -29,6 +29,10 @@ android {
             )
         }
     }
+    androidResources {
+        // The segmentation model is memory-mapped straight from the APK, so it must stay uncompressed.
+        noCompress += "tflite"
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
@@ -40,6 +44,7 @@ dependencies {
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
     implementation(libs.androidx.recyclerview)
+    implementation(libs.mediapipe.tasks.vision)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
