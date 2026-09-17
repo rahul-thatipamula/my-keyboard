@@ -97,11 +97,12 @@
         </com.google.android.material.card.MaterialCardView>
 
         <!-- Live preview -->
-        <TextView
-            style="@style/SectionHeader"
-            android:text="@string/home_preview_title" />
+        <include
+            android:id="@+id/previewHeader"
+            layout="@layout/row_collapsible_header" />
 
         <com.google.android.material.card.MaterialCardView
+            android:id="@+id/previewCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             app:cardCornerRadius="16dp"

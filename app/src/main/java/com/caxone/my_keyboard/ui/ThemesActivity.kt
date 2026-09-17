@@ -45,8 +45,7 @@ class ThemesActivity : BaseSettingsActivity() {
         previewKeyboard = KeyboardView(this).apply { interactive = false }
         previewColumn.addView(previewStrip)
         previewColumn.addView(previewKeyboard)
-        section(R.string.home_preview_title)
-        card(previewColumn)
+        collapsibleCard(R.string.home_preview_title, Prefs.KEY_PREVIEW_COLLAPSED, previewColumn)
 
         // Presets
         section(R.string.presets_title)

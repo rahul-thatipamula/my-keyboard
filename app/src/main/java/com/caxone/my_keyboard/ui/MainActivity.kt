@@ -57,6 +57,7 @@ class MainActivity : AppCompatActivity() {
         previewKeyboard = KeyboardView(this).apply { interactive = false }
         container.addView(previewStrip)
         container.addView(previewKeyboard)
+        Collapsible.bind(findViewById(R.id.previewHeader), findViewById(R.id.previewCard), R.string.home_preview_title, Prefs.KEY_PREVIEW_COLLAPSED)
 
         navContainer = findViewById(R.id.navContainer)
         buildNavigation()
