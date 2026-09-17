@@ -4,12 +4,12 @@ import kotlin.math.ln
 import kotlin.math.max
 
 /**
- * Combines the built-in dictionary with the user's personal model to produce
+ * Combines the language engine's lexicons with the user's personal model to produce
  * next-word predictions, completions, and autocorrect candidates.
  */
-class Predictor(private val dictionary: Dictionary, private val user: UserModel) {
+class Predictor(private val dictionary: LanguageEngine, private val user: UserModel) {
 
-    private val phrases = PhraseBuilder(user::after, user::after)
+    private val phrases = PhraseBuilder(user::after, user::after) { p -> dictionary.seedNext(p).toMap() }
 
     /**
      * [words] always has three entries (may be empty strings). [primary] is the index of the
@@ -20,6 +20,7 @@ class Predictor(private val dictionary: Dictionary, private val user: UserModel)
     // ---- next word -------------------------------------------------------------------------
 
     fun nextWords(prev2: String?, prev1: String?): List<String> {
+        dictionary.setContext(prev2, prev1)
         val p1 = prev1 ?: SENTENCE_START
         val scores = HashMap<String, Double>()
         fun add(w: String, s: Double) { scores[w] = (scores[w] ?: 0.0) + s }
@@ -43,10 +44,14 @@ class Predictor(private val dictionary: Dictionary, private val user: UserModel)
     fun phraseAfter(prev1: String?, word: String): List<String> =
         if (word.isEmpty()) emptyList() else phrases.extend(prev1, word.lowercase())
 
+    /** The language the sentence before the cursor is in, after the last [nextWords] / [forComposing]. */
+    val contextLanguage: Language? get() = dictionary.contextLanguage
+
     // ---- composing --------------------------------------------------------------------------
 
     fun forComposing(typedRaw: String, prev2: String?, prev1: String?, autocorrectEnabled: Boolean): Result {
         val typed = typedRaw.lowercase()
+        dictionary.setContext(prev2, prev1)
         val p1 = prev1 ?: SENTENCE_START
         val tri = if (prev2 != null) user.after(prev2, p1) else emptyMap()
         val bi = user.after(p1)
@@ -113,6 +118,12 @@ class Predictor(private val dictionary: Dictionary, private val user: UserModel)
             val strong = (scores[best] ?: 0.0) > 1.5
             val looksLikeName = typedRaw[0].isUpperCase() && prev1 != null && typedRaw.drop(1).any { it.isLowerCase() }
             if (strong && !looksLikeName && (d > 0 || lengthDiff <= 1)) autoCorrect = true
+            // Tenglish spelling is free-form ("unnavu" / "unnav" / "unnaru"), so never rewrite a word
+            // in a Telugu sentence, and be stricter when the sentence language is still unknown.
+            if (dictionary.teluguEnabled) {
+                if (dictionary.contextLanguage == Language.TELUGU) autoCorrect = false
+                else if (dictionary.contextLanguage == null && d > TELUGU_NEUTRAL_MAX_DISTANCE) autoCorrect = false
+            }
         }
 
         val words = ArrayList<String>(3)
@@ -144,6 +155,9 @@ class Predictor(private val dictionary: Dictionary, private val user: UserModel)
     companion object {
         const val SENTENCE_START = "<s>"
 
+        /** When Telugu is on and the sentence language is unclear, only fix near-certain slips. */
+        const val TELUGU_NEUTRAL_MAX_DISTANCE = 1.0
+
         /** Phrase suggestions: how far to extend a word and how sure the model must be. */
         const val PHRASE_MAX_EXTRA = 3
         const val PHRASE_MAX_CHARS = 26
@@ -151,5 +165,8 @@ class Predictor(private val dictionary: Dictionary, private val user: UserModel)
         const val PHRASE_MIN_COUNT = 2
         /** …and must account for at least this share of everything typed in that context. */
         const val PHRASE_DOMINANCE = 0.5
+        /** Built-in phrase seeds are generic, so they need a clearer majority than the user's own. */
+        const val PHRASE_SEED_MIN_COUNT = 300
+        const val PHRASE_SEED_DOMINANCE = 0.6
     }
 }

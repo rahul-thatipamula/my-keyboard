@@ -1,15 +1,17 @@
 package com.caxone.my_keyboard.prediction
 
 /**
- * Grows a single suggested word into a short phrase by repeatedly asking the personal model
- * what usually comes next, and stopping as soon as it is no longer sure. Only the user's own
- * trigrams and bigrams are consulted, so phrases are things this user actually types.
+ * Grows a single suggested word into a short phrase by repeatedly asking what usually comes
+ * next, and stopping as soon as nothing is clearly expected. The user's own trigrams and
+ * bigrams come first; the built-in phrase [seed] (e.g. "ela" → "unnavu", "good" → "morning")
+ * is consulted only when it has a clear majority.
  *
  * [trigram] and [bigram] return follower → count maps for a context, like [UserModel.after].
  */
 class PhraseBuilder(
     private val trigram: (String, String) -> Map<String, Int>,
-    private val bigram: (String) -> Map<String, Int>
+    private val bigram: (String) -> Map<String, Int>,
+    private val seed: (String) -> Map<String, Int> = { emptyMap() }
 ) {
 
     /**
@@ -36,11 +38,12 @@ class PhraseBuilder(
     /** The single follower that dominates its context, or null when nothing does. */
     private fun confidentNext(p2: String?, p1: String): String? {
         val tri = if (p2 != null) trigram(p2, p1) else emptyMap()
-        dominant(tri)?.let { return it }
-        return dominant(bigram(p1))
+        dominant(tri, Predictor.PHRASE_MIN_COUNT, Predictor.PHRASE_DOMINANCE)?.let { return it }
+        dominant(bigram(p1), Predictor.PHRASE_MIN_COUNT, Predictor.PHRASE_DOMINANCE)?.let { return it }
+        return dominant(seed(p1), Predictor.PHRASE_SEED_MIN_COUNT, Predictor.PHRASE_SEED_DOMINANCE)
     }
 
-    private fun dominant(followers: Map<String, Int>): String? {
+    private fun dominant(followers: Map<String, Int>, minCount: Int, dominance: Double): String? {
         if (followers.isEmpty()) return null
         var best: String? = null
         var bestCount = 0
@@ -49,8 +52,8 @@ class PhraseBuilder(
             total += c
             if (c > bestCount) { best = w; bestCount = c }
         }
-        if (bestCount < Predictor.PHRASE_MIN_COUNT) return null
-        if (bestCount < Predictor.PHRASE_DOMINANCE * total) return null
+        if (bestCount < minCount) return null
+        if (bestCount < dominance * total) return null
         return best
     }
 }

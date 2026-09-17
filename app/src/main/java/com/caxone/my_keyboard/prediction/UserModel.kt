@@ -11,7 +11,7 @@ import kotlin.math.abs
  * Keeps unigram / bigram / trigram counts in memory (for instant lookups) and
  * mirrors every update to SQLite on a background thread so it survives restarts.
  */
-class UserModel private constructor(context: Context) : SQLiteOpenHelper(context, "user_model.db", null, 1) {
+class UserModel private constructor(context: Context) : SQLiteOpenHelper(context, "user_model.db", null, 2) {
 
     companion object {
         @Volatile
@@ -25,6 +25,8 @@ class UserModel private constructor(context: Context) : SQLiteOpenHelper(context
     }
 
     private val unigrams = HashMap<String, Int>()
+    /** Which language a learned word belongs to, when the intelligent layer could tell. */
+    private val languages = HashMap<String, Language>()
     private val bigrams = HashMap<String, HashMap<String, Int>>()
     private val trigrams = HashMap<String, HashMap<String, Int>>()
     private val io = Executors.newSingleThreadExecutor()
@@ -40,14 +42,19 @@ class UserModel private constructor(context: Context) : SQLiteOpenHelper(context
         db.execSQL("CREATE TABLE trigram(w1 TEXT, w2 TEXT, w3 TEXT, count INTEGER NOT NULL, PRIMARY KEY(w1, w2, w3))")
     }
 
-    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        if (oldVersion < 2) db.execSQL("ALTER TABLE unigram ADD COLUMN lang TEXT")
+    }
 
     fun load() {
         if (isLoaded) return
         val db = readableDatabase
         synchronized(lock) {
-            db.rawQuery("SELECT word, count FROM unigram", null).use { c ->
-                while (c.moveToNext()) unigrams[c.getString(0)] = c.getInt(1)
+            db.rawQuery("SELECT word, count, lang FROM unigram", null).use { c ->
+                while (c.moveToNext()) {
+                    unigrams[c.getString(0)] = c.getInt(1)
+                    Language.fromId(c.getString(2))?.let { languages[c.getString(0)] = it }
+                }
             }
             db.rawQuery("SELECT w1, w2, count FROM bigram", null).use { c ->
                 while (c.moveToNext()) bigrams.getOrPut(c.getString(0)) { HashMap() }[c.getString(1)] = c.getInt(2)
@@ -64,10 +71,18 @@ class UserModel private constructor(context: Context) : SQLiteOpenHelper(context
     // Words never contain spaces, so a space is a safe separator for the trigram key.
     private fun key(w1: String, w2: String) = "$w1 $w2"
 
-    /** Records that [word] followed [prev1] (and [prev2] before that). Use "<s>" for sentence start. */
-    fun learn(prev2: String?, prev1: String?, word: String) {
+    /**
+     * Records that [word] followed [prev1] (and [prev2] before that). Use "<s>" for sentence start.
+     * [language] tags the word the first time it is seen so it can be offered in the right context.
+     */
+    fun learn(prev2: String?, prev1: String?, word: String, language: Language? = null) {
+        var tag: Language? = null
         synchronized(lock) {
             unigrams[word] = (unigrams[word] ?: 0) + 1
+            if (language != null && word !in languages) {
+                languages[word] = language
+                tag = language
+            }
             if (prev1 != null) {
                 val m = bigrams.getOrPut(prev1) { HashMap() }
                 m[word] = (m[word] ?: 0) + 1
@@ -83,6 +98,7 @@ class UserModel private constructor(context: Context) : SQLiteOpenHelper(context
             try {
                 db.execSQL("INSERT OR IGNORE INTO unigram(word, count) VALUES(?, 0)", arrayOf(word))
                 db.execSQL("UPDATE unigram SET count = count + 1 WHERE word = ?", arrayOf(word))
+                tag?.let { db.execSQL("UPDATE unigram SET lang = ? WHERE word = ? AND lang IS NULL", arrayOf(it.id, word)) }
                 if (prev1 != null) {
                     db.execSQL("INSERT OR IGNORE INTO bigram(w1, w2, count) VALUES(?, ?, 0)", arrayOf(prev1, word))
                     db.execSQL("UPDATE bigram SET count = count + 1 WHERE w1 = ? AND w2 = ?", arrayOf(prev1, word))
@@ -105,6 +121,8 @@ class UserModel private constructor(context: Context) : SQLiteOpenHelper(context
     }
 
     fun count(word: String): Int = synchronized(lock) { unigrams[word] ?: 0 }
+
+    fun languageOf(word: String): Language? = synchronized(lock) { languages[word] }
 
     fun after(prev1: String): Map<String, Int> =
         synchronized(lock) { bigrams[prev1]?.let { HashMap(it) } ?: emptyMap() }
@@ -143,6 +161,7 @@ class UserModel private constructor(context: Context) : SQLiteOpenHelper(context
     fun remove(word: String) {
         synchronized(lock) {
             unigrams.remove(word)
+            languages.remove(word)
             bigrams.remove(word)
             for (m in bigrams.values) m.remove(word)
             val deadKeys = trigrams.keys.filter { k -> k.split(' ').any { it == word } }
@@ -166,6 +185,7 @@ class UserModel private constructor(context: Context) : SQLiteOpenHelper(context
     fun clear() {
         synchronized(lock) {
             unigrams.clear()
+            languages.clear()
             bigrams.clear()
             trigrams.clear()
         }

@@ -10,7 +10,7 @@ import kotlin.math.ln
  * keys where the finger changed direction sharply (plus the first and last key). Corners are
  * the letters the user almost certainly meant; everything else may just be on the way.
  */
-class GlideDecoder(private val dictionary: Dictionary, private val user: UserModel) {
+class GlideDecoder(private val dictionary: LanguageEngine, private val user: UserModel) {
 
     class GlidePath(val letters: String, val corners: BooleanArray)
 

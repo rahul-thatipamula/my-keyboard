@@ -16,11 +16,13 @@ import com.caxone.my_keyboard.keyboard.KeyboardView
 import com.caxone.my_keyboard.keyboard.Layouts
 import com.caxone.my_keyboard.keyboard.SuggestionStrip
 import com.caxone.my_keyboard.media.StickerStore
+import com.caxone.my_keyboard.prediction.LanguageEngine
 import com.caxone.my_keyboard.prediction.UserModel
 import com.caxone.my_keyboard.settings.Prefs
 import com.caxone.my_keyboard.theme.ThemeStore
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.divider.MaterialDivider
 
 /** Home screen: setup status, a live preview, and links to each settings group. */
@@ -37,6 +39,7 @@ class MainActivity : AppCompatActivity() {
 
     private var themesSummary: TextView? = null
     private var layoutSummary: TextView? = null
+    private var languagesSummary: TextView? = null
     private var stickersSummary: TextView? = null
     private var learnedSummary: TextView? = null
 
@@ -63,6 +66,24 @@ class MainActivity : AppCompatActivity() {
         buildNavigation()
 
         Thread { UserModel.get(this).load() }.start()
+        if (!Prefs.languagesAsked(this)) askLanguages()
+    }
+
+    /** One-time question so the intelligent layer knows which words to expect. */
+    private fun askLanguages() {
+        val modes = LanguageEngine.Mode.entries
+        val labels = modes.map { getString(LanguagesActivity.titleFor(it)) }.toTypedArray()
+        var picked = modes.indexOf(LanguageEngine.Mode.BOTH)
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.languages_ask_title)
+            .setMessage(R.string.languages_ask_body)
+            .setSingleChoiceItems(labels, picked) { _, which -> picked = which }
+            .setPositiveButton(R.string.languages_ask_ok) { _, _ ->
+                Prefs.setLanguages(this, modes[picked])
+                refreshSummaries()
+            }
+            .setCancelable(false)
+            .show()
     }
 
     override fun onResume() {
@@ -113,6 +134,7 @@ class MainActivity : AppCompatActivity() {
         group(
             nav(R.drawable.ic_palette, R.string.nav_themes, "") { open(ThemesActivity::class.java) }.also { themesSummary = it.findViewById(R.id.summary) },
             nav(R.drawable.ic_keyboard, R.string.nav_layout, "") { open(LayoutActivity::class.java) }.also { layoutSummary = it.findViewById(R.id.summary) },
+            nav(R.drawable.ic_translate, R.string.nav_languages, "") { open(LanguagesActivity::class.java) }.also { languagesSummary = it.findViewById(R.id.summary) },
             nav(R.drawable.ic_spellcheck, R.string.nav_typing, getString(R.string.nav_typing_sum)) { open(TypingActivity::class.java) },
             nav(R.drawable.ic_vibration, R.string.nav_feedback, getString(R.string.nav_feedback_sum)) { open(FeedbackActivity::class.java) }
         )
@@ -131,6 +153,7 @@ class MainActivity : AppCompatActivity() {
     private fun refreshSummaries() {
         themesSummary?.text = getString(R.string.nav_themes_sum, ThemeStore.current(this).name)
         layoutSummary?.text = getString(R.string.nav_layout_sum, Prefs.layout(this).displayName)
+        languagesSummary?.text = getString(LanguagesActivity.titleFor(Prefs.languages(this)))
         val stickers = StickerStore.count(this)
         stickersSummary?.text = if (stickers == 0) getString(R.string.nav_stickers_sum_none)
         else resources.getQuantityString(R.plurals.nav_stickers_sum, stickers, stickers)
