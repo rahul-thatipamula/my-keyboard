@@ -51,13 +51,21 @@ Closes #N"
 git push -u origin fix/N-short-description
 ```
 
+### 4a. Group commits by feature
+
+When a branch delivers several distinct features, make one commit per feature (in dependency order) rather than one big commit, so `git log` reads as a changelog. Each commit should build on its own. Reference the issue with `Part of #N` in each, and `Closes #N` in the last one.
+
 ### 5. Merge into main
 
-Open a PR and merge it. Use squash so `main` gets one commit per issue.
+Open a PR and merge it.
+
+- **Single-feature branch** → squash, so `main` gets one commit per issue.
+- **Multi-feature branch** (grouped commits from 4a) → merge commit, so the grouped history is preserved on `main`.
 
 ```bash
 gh pr create --fill --base main
-gh pr merge --squash --delete-branch
+gh pr merge --squash --delete-branch    # single feature
+gh pr merge --merge  --delete-branch    # grouped features
 ```
 
 `--delete-branch` removes the remote branch and switches you back to `main`.
@@ -78,5 +86,6 @@ Confirm the issue closed: `gh issue view N`.
 ## Conventions
 
 - Kotlin, 4-space indent, match the style of surrounding code.
+- Bump `versionCode` / `versionName` in `app/build.gradle.kts` whenever a branch adds user-visible features.
 - Prediction weights live as plain constants in `prediction/Predictor.kt`; tune there, don't scatter magic numbers.
 - The personal language model (`prediction/UserModel.kt`) must stay on-device only.
