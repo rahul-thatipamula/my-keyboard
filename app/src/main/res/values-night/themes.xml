@@ -3,9 +3,12 @@
         <item name="colorPrimary">@color/brand_200</item>
         <item name="colorPrimaryVariant">@color/brand_700</item>
         <item name="colorOnPrimary">@color/black</item>
-        <item name="colorSecondary">@color/teal_200</item>
-        <item name="colorSecondaryVariant">@color/teal_200</item>
+        <item name="colorSecondary">@color/brand_200</item>
+        <item name="colorSecondaryVariant">@color/brand_200</item>
         <item name="colorOnSecondary">@color/black</item>
-        <item name="android:statusBarColor">?attr/colorPrimaryVariant</item>
+        <item name="android:windowBackground">@color/screen_bg</item>
+        <item name="android:statusBarColor">@color/screen_bg</item>
+        <item name="android:windowLightStatusBar" tools:targetApi="m">false</item>
+        <item name="android:navigationBarColor">@color/screen_bg</item>
     </style>
 </resources>

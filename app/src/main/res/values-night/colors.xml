@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="icon_circle">#338AB4F8</color>
+    <color name="screen_bg">#FF121316</color>
+    <color name="card_stroke">#1FFFFFFF</color>
+    <color name="text_secondary">#FF9AA0A6</color>
+</resources>

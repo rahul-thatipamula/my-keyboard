@@ -3,6 +3,7 @@ package com.caxone.my_keyboard.keyboard
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.media.AudioManager
@@ -15,17 +16,23 @@ import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 import android.view.inputmethod.InputMethodManager
+import com.caxone.my_keyboard.prediction.GlideDecoder
 import com.caxone.my_keyboard.theme.KeyboardTheme
+import kotlin.math.abs
+import kotlin.math.atan2
+import kotlin.math.hypot
 
 /**
  * Draws the keys and turns touches into key events. Supports multi-touch, key preview
- * popups, long-press hints, delete auto-repeat, shift / caps-lock, and sliding between keys.
+ * popups, long-press hints, delete auto-repeat, shift / caps-lock, sliding between keys,
+ * and glide typing (drawing a path across letters to spell a word).
  */
 class KeyboardView @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) : View(context, attrs) {
 
     interface Listener {
         fun onKey(key: Key)
         fun onText(text: String)
+        fun onGlide(path: GlideDecoder.GlidePath)
     }
 
     enum class ShiftState { OFF, ON, LOCKED }
@@ -47,6 +54,7 @@ class KeyboardView @JvmOverloads constructor(context: Context, attrs: AttributeS
     var showPreview = true
     var hapticEnabled = true
     var soundEnabled = false
+    var glideEnabled = true
 
     /** When false the view is purely decorative (used for the in-app preview). */
     var interactive = true
@@ -79,13 +87,30 @@ class KeyboardView @JvmOverloads constructor(context: Context, attrs: AttributeS
     private var longPressConsumed = false
     private var lastShiftTap = 0L
 
+    // Glide typing: a single pointer dragged across letter keys.
+    private var gliding = false
+    private var glidePointer = -1
+    private var glideStartX = 0f
+    private var glideStartY = 0f
+    private val glidePoints = ArrayList<Float>()      // x0, y0, x1, y1, ...
+    private val glideKeys = ArrayList<Key>()
+    private val glideKeyPointIndex = ArrayList<Int>()  // index into glidePoints/2 where each key was entered
+    private val trailPath = Path()
+    private val trailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+    }
+
     private fun sp(v: Float) = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, v, resources.displayMetrics)
 
     // ---- layout ---------------------------------------------------------------------------
 
+    private fun rowHeight(row: List<Key>): Float = keyHeight * (row.firstOrNull()?.heightScale ?: 1f)
+
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val w = MeasureSpec.getSize(widthMeasureSpec)
-        val h = (padTop + padBottom + layout.rows.size * keyHeight).toInt()
+        val h = (padTop + padBottom + layout.rows.sumOf { rowHeight(it).toDouble() }).toInt()
         setMeasuredDimension(w, h)
     }
 
@@ -98,15 +123,16 @@ class KeyboardView @JvmOverloads constructor(context: Context, attrs: AttributeS
         var y = padTop
         for (row in layout.rows) {
             val total = row.sumOf { it.width.toDouble() }.toFloat()
+            val rh = rowHeight(row)
             var x = padH + (10f - total) / 2f * unit
             for (key in row) {
                 key.x = x
                 key.y = y
                 key.w = key.width * unit
-                key.h = keyHeight
+                key.h = rh
                 x += key.w
             }
-            y += keyHeight
+            y += rh
         }
         geometryDirty = false
     }
@@ -120,7 +146,22 @@ class KeyboardView @JvmOverloads constructor(context: Context, attrs: AttributeS
         canvas.drawColor(theme.background)
         val pressedKeys = pressed.values
         for (key in layout.keys) drawKey(canvas, key, key in pressedKeys)
+        if (gliding) drawTrail(canvas)
         drawPreview(canvas)
+    }
+
+    private fun drawTrail(canvas: Canvas) {
+        if (glidePoints.size < 4) return
+        trailPath.rewind()
+        trailPath.moveTo(glidePoints[0], glidePoints[1])
+        var i = 2
+        while (i < glidePoints.size) {
+            trailPath.lineTo(glidePoints[i], glidePoints[i + 1])
+            i += 2
+        }
+        trailPaint.color = (theme.accent and 0x00FFFFFF) or 0xB0000000.toInt()
+        trailPaint.strokeWidth = 7f * density
+        canvas.drawPath(trailPath, trailPaint)
     }
 
     private fun labelFor(key: Key): String = when (key.type) {
@@ -205,16 +246,34 @@ class KeyboardView @JvmOverloads constructor(context: Context, attrs: AttributeS
                 }
                 pressed[pointerId] = key
                 longPressConsumed = false
+                if (pressed.size == 1) {
+                    glideStartX = event.getX(index)
+                    glideStartY = event.getY(index)
+                }
                 feedback()
                 showPreviewFor(key, labelFor(key))
                 scheduleLongPress(key)
                 invalidate()
             }
             MotionEvent.ACTION_MOVE -> {
+                if (gliding) {
+                    val gi = event.findPointerIndex(glidePointer)
+                    if (gi >= 0) addGlidePoint(event.getX(gi), event.getY(gi))
+                    return true
+                }
                 for (i in 0 until event.pointerCount) {
                     val id = event.getPointerId(i)
                     val current = pressed[id] ?: continue
-                    val k = keyAt(event.getX(i), event.getY(i))
+                    val x = event.getX(i)
+                    val y = event.getY(i)
+                    if (canStartGlide(id, current) && hypot(x - glideStartX, y - glideStartY) > GLIDE_START_DISTANCE * density) {
+                        val k = keyAt(x, y)
+                        if (k != null && k !== current && k.isLetter) {
+                            beginGlide(id, current, x, y)
+                            return true
+                        }
+                    }
+                    val k = keyAt(x, y)
                     if (k != null && k !== current) {
                         pressed[id] = k
                         cancelTimers()
@@ -226,6 +285,11 @@ class KeyboardView @JvmOverloads constructor(context: Context, attrs: AttributeS
                 }
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
+                if (gliding && pointerId == glidePointer) {
+                    addGlidePoint(event.getX(index), event.getY(index))
+                    finishGlide()
+                    return true
+                }
                 val key = pressed.remove(pointerId)
                 cancelTimers()
                 previewKey = null
@@ -237,10 +301,100 @@ class KeyboardView @JvmOverloads constructor(context: Context, attrs: AttributeS
                 pressed.clear()
                 cancelTimers()
                 previewKey = null
+                resetGlide()
                 invalidate()
             }
         }
         return true
+    }
+
+    // ---- glide ----------------------------------------------------------------------------
+
+    private fun canStartGlide(pointerId: Int, key: Key): Boolean =
+        glideEnabled && layout.isLetters && key.isLetter && pressed.size == 1 && !longPressConsumed &&
+            pressed.containsKey(pointerId)
+
+    private fun beginGlide(pointerId: Int, startKey: Key, x: Float, y: Float) {
+        gliding = true
+        glidePointer = pointerId
+        pressed.clear()
+        cancelTimers()
+        previewKey = null
+        glidePoints.clear()
+        glideKeys.clear()
+        glideKeyPointIndex.clear()
+        glidePoints.add(glideStartX); glidePoints.add(glideStartY)
+        glideKeys.add(startKey)
+        glideKeyPointIndex.add(0)
+        addGlidePoint(x, y)
+    }
+
+    private fun addGlidePoint(x: Float, y: Float) {
+        val n = glidePoints.size
+        if (n >= 2) {
+            val dx = x - glidePoints[n - 2]
+            val dy = y - glidePoints[n - 1]
+            if (hypot(dx, dy) < GLIDE_SAMPLE_DISTANCE * density) return
+        }
+        glidePoints.add(x); glidePoints.add(y)
+        val k = keyAt(x, y)
+        if (k != null && k.isLetter && k !== glideKeys.last()) {
+            glideKeys.add(k)
+            glideKeyPointIndex.add(glidePoints.size / 2 - 1)
+        }
+        invalidate()
+    }
+
+    private fun finishGlide() {
+        val path = buildGlidePath()
+        resetGlide()
+        invalidate()
+        if (path != null) {
+            feedback()
+            listener?.onGlide(path)
+        }
+    }
+
+    private fun resetGlide() {
+        gliding = false
+        glidePointer = -1
+        glidePoints.clear()
+        glideKeys.clear()
+        glideKeyPointIndex.clear()
+    }
+
+    /**
+     * Collapses the recorded points into the letter sequence plus a corner flag per letter.
+     * A corner is a sharp change of direction, which almost always means the finger
+     * deliberately stopped on that key.
+     */
+    private fun buildGlidePath(): GlideDecoder.GlidePath? {
+        if (glideKeys.size < 2) return null
+        val letters = StringBuilder(glideKeys.size)
+        for (k in glideKeys) letters.append(k.output[0].lowercaseChar())
+
+        val pointCount = glidePoints.size / 2
+        val cornerPoint = BooleanArray(pointCount)
+        val window = 3
+        for (i in window until pointCount - window) {
+            val ax = glidePoints[2 * i] - glidePoints[2 * (i - window)]
+            val ay = glidePoints[2 * i + 1] - glidePoints[2 * (i - window) + 1]
+            val bx = glidePoints[2 * (i + window)] - glidePoints[2 * i]
+            val by = glidePoints[2 * (i + window) + 1] - glidePoints[2 * i + 1]
+            var angle = abs(Math.toDegrees((atan2(by, bx) - atan2(ay, ax)).toDouble()))
+            if (angle > 180) angle = 360 - angle
+            if (angle > GLIDE_CORNER_DEGREES) cornerPoint[i] = true
+        }
+
+        val corners = BooleanArray(glideKeys.size)
+        corners[0] = true
+        corners[corners.size - 1] = true
+        for (ki in 1 until glideKeys.size - 1) {
+            val from = glideKeyPointIndex[ki]
+            val to = glideKeyPointIndex[ki + 1]
+            for (pi in from until to) if (cornerPoint[pi]) { corners[ki] = true; break }
+        }
+        return GlideDecoder.GlidePath(letters.toString(), corners)
     }
 
     private fun showPreviewFor(key: Key, text: String) {
@@ -332,5 +486,8 @@ class KeyboardView @JvmOverloads constructor(context: Context, attrs: AttributeS
         private const val LONG_PRESS_MS = 350L
         private const val REPEAT_MS = 45L
         private const val DOUBLE_TAP_MS = 300L
+        private const val GLIDE_START_DISTANCE = 22f   // dp moved before a press becomes a glide
+        private const val GLIDE_SAMPLE_DISTANCE = 4f   // dp between recorded trail points
+        private const val GLIDE_CORNER_DEGREES = 55.0
     }
 }

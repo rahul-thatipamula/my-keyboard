@@ -126,6 +126,43 @@ class UserModel private constructor(context: Context) : SQLiteOpenHelper(context
         unigrams.keys.filter { abs(it.length - length) <= 1 }
     }
 
+    /** Learned words starting with [c]. */
+    fun wordsStartingWith(c: Char): List<String> = synchronized(lock) {
+        unigrams.keys.filter { it.isNotEmpty() && it[0] == c }
+    }
+
+    /** Every learned word with its count, most used first. */
+    fun allWords(): List<Pair<String, Int>> = synchronized(lock) {
+        unigrams.entries.sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
+            .map { it.key to it.value }
+    }
+
+    fun size(): Int = synchronized(lock) { unigrams.size }
+
+    /** Forgets [word] entirely, including every bigram and trigram it takes part in. */
+    fun remove(word: String) {
+        synchronized(lock) {
+            unigrams.remove(word)
+            bigrams.remove(word)
+            for (m in bigrams.values) m.remove(word)
+            val deadKeys = trigrams.keys.filter { k -> k.split(' ').any { it == word } }
+            for (k in deadKeys) trigrams.remove(k)
+            for (m in trigrams.values) m.remove(word)
+        }
+        io.execute {
+            val db = writableDatabase
+            db.beginTransaction()
+            try {
+                db.execSQL("DELETE FROM unigram WHERE word = ?", arrayOf(word))
+                db.execSQL("DELETE FROM bigram WHERE w1 = ? OR w2 = ?", arrayOf(word, word))
+                db.execSQL("DELETE FROM trigram WHERE w1 = ? OR w2 = ? OR w3 = ?", arrayOf(word, word, word))
+                db.setTransactionSuccessful()
+            } finally {
+                db.endTransaction()
+            }
+        }
+    }
+
     fun clear() {
         synchronized(lock) {
             unigrams.clear()

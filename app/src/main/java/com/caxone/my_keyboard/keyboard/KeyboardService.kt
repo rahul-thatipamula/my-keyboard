@@ -1,13 +1,27 @@
 package com.caxone.my_keyboard.keyboard
 
+import android.content.Intent
 import android.inputmethodservice.InputMethodService
 import android.text.InputType
 import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
+import android.view.ContextThemeWrapper
+import android.view.WindowManager
+import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
+import com.caxone.my_keyboard.R
+import com.caxone.my_keyboard.media.EmojiPanel
+import com.caxone.my_keyboard.media.GifPanel
+import com.caxone.my_keyboard.media.MediaBar
+import com.caxone.my_keyboard.media.StickerPanel
+import com.caxone.my_keyboard.media.StickerSender
+import com.caxone.my_keyboard.media.StickerStore
 import com.caxone.my_keyboard.prediction.Dictionary
+import com.caxone.my_keyboard.prediction.GlideDecoder
 import com.caxone.my_keyboard.prediction.Predictor
 import com.caxone.my_keyboard.prediction.UserModel
 import com.caxone.my_keyboard.settings.Prefs
@@ -18,10 +32,16 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     private lateinit var dictionary: Dictionary
     private lateinit var userModel: UserModel
     private lateinit var predictor: Predictor
+    private lateinit var glideDecoder: GlideDecoder
 
     private var root: LinearLayout? = null
     private lateinit var strip: SuggestionStrip
     private lateinit var keyboard: KeyboardView
+    private lateinit var panelHost: FrameLayout
+    private lateinit var mediaBar: MediaBar
+    private lateinit var emojiPanel: EmojiPanel
+    private lateinit var gifPanel: GifPanel
+    private lateinit var stickerPanel: StickerPanel
 
     /** The word currently being typed (underlined in the editor). */
     private val composing = StringBuilder()
@@ -40,6 +60,10 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     private var lastKeyWasSpace = false
     private var lastSpaceTime = 0L
 
+    /** Alternatives for the word that was just glided, shown until the user moves on. */
+    private var glideResult: Predictor.Result? = null
+    private var composingFromGlide = false
+
     companion object {
         private val SENTENCE_END = charArrayOf('.', '!', '?')
         private val WORD_PATTERN = Regex("[a-z][a-z']*")
@@ -54,6 +78,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         dictionary = Dictionary(this)
         userModel = UserModel.get(this)
         predictor = Predictor(dictionary, userModel)
+        glideDecoder = GlideDecoder(dictionary, userModel)
         Thread {
             dictionary.load()
             userModel.load()
@@ -64,11 +89,108 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         val container = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         strip = SuggestionStrip(this).also { it.onSuggestionClick = { i -> onSuggestionPicked(i) } }
         keyboard = KeyboardView(this).also { it.listener = this }
-        container.addView(strip, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
-        container.addView(keyboard, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+        panelHost = FrameLayout(this).apply { visibility = View.GONE }
+        mediaBar = MediaBar(this).also { it.onTabSelected = { tab -> showPanel(tab) } }
+
+        emojiPanel = EmojiPanel(this).apply {
+            onEmoji = { insertEmoji(it) }
+            onBack = { mediaBar.select(null) }
+            onBackspace = { handleDelete() }
+        }
+        gifPanel = GifPanel(this).apply {
+            onBack = { mediaBar.select(null) }
+            onBackspace = { handleDelete() }
+        }
+        stickerPanel = StickerPanel(this).apply {
+            onSticker = { sendSticker(it) }
+            onCreate = { openStickerMaker() }
+            onDeleteRequest = { confirmDeleteSticker(it) }
+            onBack = { mediaBar.select(null) }
+            onBackspace = { handleDelete() }
+        }
+
+        val wrap = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+        container.addView(strip, wrap)
+        container.addView(keyboard, wrap)
+        container.addView(panelHost, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+        container.addView(mediaBar, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (MediaBar.HEIGHT_DP * resources.displayMetrics.density).toInt()))
         root = container
         applyTheme()
         return container
+    }
+
+    // ---- media panels -----------------------------------------------------------------------
+
+    /** Swaps the keys for the chosen panel (or back to the keys when [tab] is null). */
+    private fun showPanel(tab: MediaBar.Tab?) {
+        if (composing.isNotEmpty()) commitComposing(false)
+        panelHost.removeAllViews()
+        if (tab == null) {
+            panelHost.visibility = View.GONE
+            keyboard.visibility = View.VISIBLE
+            strip.visibility = if (suggestionsOn) View.VISIBLE else View.GONE
+            refreshSuggestions()
+            return
+        }
+        val panel = when (tab) {
+            MediaBar.Tab.EMOJI -> emojiPanel.also { it.refresh() }
+            MediaBar.Tab.GIF -> gifPanel
+            MediaBar.Tab.STICKERS -> stickerPanel.also { it.refresh() }
+        }
+        val height = keyboard.height + (if (strip.visibility == View.VISIBLE) strip.height else 0)
+        val fallback = (300 * resources.displayMetrics.density).toInt()
+        panelHost.addView(panel, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, if (height > 0) height else fallback))
+        keyboard.visibility = View.GONE
+        strip.visibility = View.GONE
+        panelHost.visibility = View.VISIBLE
+    }
+
+    private fun closePanel() {
+        if (mediaBar.selected != null) {
+            mediaBar.reset()
+            showPanel(null)
+        }
+    }
+
+    private fun insertEmoji(emoji: String) {
+        val ic = currentInputConnection ?: return
+        if (composing.isNotEmpty()) commitComposing(false)
+        ic.commitText(emoji, 1)
+        lastAutoCorrect = null
+        lastKeyWasSpace = false
+    }
+
+    private fun sendSticker(file: java.io.File) {
+        val uri = StickerStore.uri(this, file)
+        val inline = StickerSender.send(this, currentInputConnection, currentInputEditorInfo, uri)
+        if (!inline) Toast.makeText(this, R.string.sticker_shared_fallback, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun openStickerMaker() {
+        val intent = Intent(this, com.caxone.my_keyboard.ui.StickerMakerActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        startActivity(intent)
+    }
+
+    private fun confirmDeleteSticker(file: java.io.File) {
+        val themed = ContextThemeWrapper(this, R.style.Theme_Mykeyboard)
+        val dialog = AlertDialog.Builder(themed)
+            .setTitle(R.string.sticker_delete)
+            .setMessage(R.string.sticker_delete_confirm)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                StickerStore.delete(file)
+                stickerPanel.refresh()
+            }
+            .create()
+        // Dialogs from an IME must be attached to the keyboard window.
+        dialog.window?.let { w ->
+            w.attributes.token = keyboard.windowToken
+            @Suppress("DEPRECATION")
+            w.setType(WindowManager.LayoutParams.TYPE_APPLICATION_ATTACHED_DIALOG)
+            w.addFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM)
+        }
+        dialog.show()
     }
 
     override fun onEvaluateFullscreenMode(): Boolean = false
@@ -77,10 +199,15 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         val theme = ThemeStore.current(this)
         keyboard.theme = theme
         strip.applyTheme(theme)
+        mediaBar.applyTheme(theme)
+        emojiPanel.applyTheme(theme)
+        gifPanel.applyTheme(theme)
+        stickerPanel.applyTheme(theme)
         root?.setBackgroundColor(theme.background)
         keyboard.showPreview = Prefs.keyPopup(this)
         keyboard.hapticEnabled = Prefs.vibrate(this)
         keyboard.soundEnabled = Prefs.sound(this)
+        keyboard.glideEnabled = Prefs.glide(this)
     }
 
     override fun onStartInputView(info: EditorInfo, restarting: Boolean) {
@@ -89,6 +216,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         composing.setLength(0)
         lastAutoCorrect = null
         lastKeyWasSpace = false
+        clearGlide()
         prev1 = null
         prev2 = null
 
@@ -106,12 +234,14 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 variation == InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS ||
                 variation == InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS
         suggestionsOn = !numeric && !password && !noSuggest
-        capSentences = cls == InputType.TYPE_CLASS_TEXT && (inputType and InputType.TYPE_TEXT_FLAG_CAP_SENTENCES) != 0
+        capSentences = Prefs.autoCap(this) && cls == InputType.TYPE_CLASS_TEXT &&
+            (inputType and InputType.TYPE_TEXT_FLAG_CAP_SENTENCES) != 0
 
-        keyboard.layout = if (numeric) Layouts.symbols() else Layouts.qwerty()
+        keyboard.layout = if (numeric) Layouts.symbols() else lettersLayout()
         keyboard.shift = KeyboardView.ShiftState.OFF
         keyboard.enterLabel = enterLabelFor(info)
         strip.visibility = if (suggestionsOn) View.VISIBLE else View.GONE
+        closePanel()
 
         seedContextFromEditor()
         updateShift()
@@ -121,6 +251,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     override fun onFinishInputView(finishingInput: Boolean) {
         currentInputConnection?.finishComposingText()
         composing.setLength(0)
+        closePanel()
         super.onFinishInputView(finishingInput)
     }
 
@@ -134,6 +265,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             composing.setLength(0)
             currentInputConnection?.finishComposingText()
             lastAutoCorrect = null
+            clearGlide()
             seedContextFromEditor()
             updateShift()
             refreshSuggestions()
@@ -143,6 +275,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             refreshSuggestions()
         }
     }
+
+    private fun lettersLayout(): Layout = Layouts.qwerty(Prefs.numberRow(this))
 
     private fun enterLabelFor(info: EditorInfo): String {
         if ((info.imeOptions and EditorInfo.IME_FLAG_NO_ENTER_ACTION) != 0) return "↵"
@@ -196,7 +330,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             strip.setSuggestions(nextWords.map { caseForNext(it) }, -1)
         } else {
             val typed = composing.toString()
-            val r = predictor.forComposing(typed, prev2, prev1, Prefs.autocorrect(this))
+            val g = glideResult
+            val r = if (g != null && composingFromGlide) g else predictor.forComposing(typed, prev2, prev1, Prefs.autocorrect(this))
             result = r
             strip.setSuggestions(r.words.map { applyCase(it, typed) }, if (r.autoCorrect) r.primary else -1)
         }
@@ -234,7 +369,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             KeyType.ENTER -> handleEnter()
             KeyType.TO_SYMBOLS -> keyboard.layout = Layouts.symbols()
             KeyType.TO_SYMBOLS2 -> keyboard.layout = Layouts.symbols2()
-            KeyType.TO_LETTERS -> keyboard.layout = Layouts.qwerty()
+            KeyType.TO_LETTERS -> keyboard.layout = lettersLayout()
             KeyType.SHIFT -> Unit
         }
     }
@@ -242,11 +377,59 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     override fun onText(text: String) {
         val ic = currentInputConnection ?: return
         if (composing.isNotEmpty()) commitComposing(false)
+        clearGlide()
         ic.commitText(text, 1)
         lastAutoCorrect = null
         lastKeyWasSpace = false
         updateShift()
         refreshSuggestions()
+    }
+
+    override fun onGlide(path: GlideDecoder.GlidePath) {
+        val ic = currentInputConnection ?: return
+        if (!dictionary.isLoaded) return
+        val words = glideDecoder.decode(path)
+        if (words.isEmpty()) return
+
+        // A glided word always stands alone: finish whatever came before and separate with a space.
+        if (composing.isNotEmpty()) {
+            commitComposing(!composingFromGlide)
+            ic.commitText(" ", 1)
+        } else if (needsSpaceBeforeWord(ic)) {
+            ic.commitText(" ", 1)
+        }
+
+        val shiftWas = keyboard.shift
+        val word = when (shiftWas) {
+            KeyboardView.ShiftState.LOCKED -> words[0].uppercase()
+            KeyboardView.ShiftState.ON -> words[0].replaceFirstChar { it.uppercase() }
+            KeyboardView.ShiftState.OFF -> words[0]
+        }
+        if (shiftWas == KeyboardView.ShiftState.ON) keyboard.shift = KeyboardView.ShiftState.OFF
+
+        composing.setLength(0)
+        composing.append(word)
+        ic.setComposingText(composing, 1)
+        val alternatives = ArrayList<String>(3)
+        alternatives.add(word)
+        for (w in words.drop(1)) alternatives.add(w)
+        while (alternatives.size < 3) alternatives.add("")
+        glideResult = Predictor.Result(alternatives, 0, false)
+        composingFromGlide = true
+        lastAutoCorrect = null
+        lastKeyWasSpace = false
+        refreshSuggestions()
+    }
+
+    /** After a glided word the cursor sits right after it; typing must not run into it. */
+    private fun needsSpaceBeforeWord(ic: InputConnection): Boolean {
+        val before = ic.getTextBeforeCursor(1, 0)?.toString() ?: return false
+        return before.isNotEmpty() && before[0].isLetterOrDigit()
+    }
+
+    private fun clearGlide() {
+        glideResult = null
+        composingFromGlide = false
     }
 
     private fun handleChar(key: Key) {
@@ -257,6 +440,11 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
 
         val isWordChar = text.length == 1 && (text[0].isLetter() || text[0] == '\'')
         if (suggestionsOn && isWordChar) {
+            if (composingFromGlide) {
+                // Typing after a glide starts a fresh word, like Gboard's automatic space.
+                commitComposing(false)
+                ic.commitText(" ", 1)
+            }
             composing.append(text)
             ic.setComposingText(composing, 1)
             lastAutoCorrect = null
@@ -279,11 +467,11 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         val ic = currentInputConnection ?: return
         val now = android.os.SystemClock.uptimeMillis()
         if (composing.isNotEmpty()) {
-            commitComposing(true)
+            commitComposing(!composingFromGlide)
             ic.commitText(" ", 1)
             lastKeyWasSpace = true
             lastSpaceTime = now
-        } else if (lastKeyWasSpace && now - lastSpaceTime < DOUBLE_SPACE_MS && canInsertPeriod(ic)) {
+        } else if (Prefs.doubleSpacePeriod(this) && lastKeyWasSpace && now - lastSpaceTime < DOUBLE_SPACE_MS && canInsertPeriod(ic)) {
             ic.deleteSurroundingText(1, 0)
             ic.commitText(". ", 1)
             prev1 = null
@@ -319,9 +507,17 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             learn(record.typed) // the user insists on this spelling; remember it
             lastAutoCorrect = null
         } else if (composing.isNotEmpty()) {
-            composing.setLength(composing.length - 1)
-            ic.setComposingText(composing, 1)
-            if (composing.isEmpty()) ic.finishComposingText()
+            if (composingFromGlide) {
+                // Backspace after a glide removes the whole word, since it was one gesture.
+                composing.setLength(0)
+                ic.setComposingText("", 1)
+                ic.finishComposingText()
+                clearGlide()
+            } else {
+                composing.setLength(composing.length - 1)
+                ic.setComposingText(composing, 1)
+                if (composing.isEmpty()) ic.finishComposingText()
+            }
         } else {
             val selected = ic.getSelectedText(0)
             if (!selected.isNullOrEmpty()) {
@@ -365,6 +561,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             val out = applyCase(word, typed)
             ic.commitText("$out ", 1)
             composing.setLength(0)
+            clearGlide()
             lastAutoCorrect = null
             learnAndPush(out)
         } else {
@@ -394,6 +591,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         }
         ic.commitText(out, 1)
         composing.setLength(0)
+        clearGlide()
         learnAndPush(out)
     }
 
